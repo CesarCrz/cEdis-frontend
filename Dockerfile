@@ -3,7 +3,8 @@ FROM node:22-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-frontend,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts --network-timeout 300000
 
 # ── Stage 2: build ───────────────────────────────────────────────────────────
 # NEXT_PUBLIC_* vars are baked into the JS bundle at build time.
