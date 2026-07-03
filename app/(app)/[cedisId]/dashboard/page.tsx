@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation"
 
-export default function DashboardRedirectPage({
+export default async function DashboardRedirectPage({
   params,
 }: {
-  params: { cedisId: string }
+  params: Promise<{ cedisId: string }>
 }) {
-  redirect(`/${params.cedisId}`)
+  const { cedisId } = await params
+  redirect(`/${cedisId}`)
 }
