@@ -1,16 +1,15 @@
 # ── Stage 1: deps ────────────────────────────────────────────────────────────
 FROM node:22-alpine AS deps
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@10.15.1
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm-frontend,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts --network-timeout 300000
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # ── Stage 2: build ───────────────────────────────────────────────────────────
-# NEXT_PUBLIC_* vars are baked into the JS bundle at build time.
-# Pass them via --build-arg when running docker build.
+# NEXT_PUBLIC_* vars bake into the JS bundle at build time — pass via --build-arg
 FROM node:22-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@10.15.1
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -37,7 +36,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
 
-COPY --from=builder /app/public                          ./public
+COPY --from=builder /app/public                                  ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone  ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static      ./.next/static
 
