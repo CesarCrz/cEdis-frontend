@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -10,44 +11,43 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    // Handle PKCE flow: ?code= in query string
+    // PKCE flow: ?code= in query string (server-exchangeable)
     const params = new URLSearchParams(window.location.search)
     const code = params.get("code")
 
     if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error }: { error: { message: string } | null }) => {
-        if (error) {
-          router.replace("/login?error=auth_failed")
-        } else {
-          router.replace("/cedis")
-        }
-      })
+      supabase.auth
+        .exchangeCodeForSession(code)
+        .then(({ error }: { error: Error | null }) => {
+          router.replace(error ? "/login?error=auth_failed" : "/cedis")
+        })
       return
     }
 
-    // Handle implicit flow: #access_token= in hash — supabase client picks it up automatically
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    // Implicit flow: #access_token= in hash — supabase client picks it up automatically
+    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      if (data.session) {
         router.replace("/cedis")
         return
       }
 
-      // Wait for onAuthStateChange to fire with the hash token
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (session) {
-          subscription.unsubscribe()
-          router.replace("/cedis")
-        } else if (event === "SIGNED_OUT") {
-          subscription.unsubscribe()
-          router.replace("/login?error=auth_failed")
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event: AuthChangeEvent, session: Session | null) => {
+          if (session) {
+            subscription.unsubscribe()
+            router.replace("/cedis")
+          } else if (event === "SIGNED_OUT") {
+            subscription.unsubscribe()
+            router.replace("/login?error=auth_failed")
+          }
         }
-      })
+      )
 
-      // Timeout fallback — if nothing happens in 5s, something went wrong
+      // Fallback: 5s timeout
       setTimeout(() => {
         subscription.unsubscribe()
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          router.replace(session ? "/cedis" : "/login?error=auth_failed")
+        supabase.auth.getSession().then(({ data: d }: { data: { session: Session | null } }) => {
+          router.replace(d.session ? "/cedis" : "/login?error=auth_failed")
         })
       }, 5000)
     })
