@@ -11,7 +11,7 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    // PKCE flow: ?code= in query string (server-exchangeable)
+    // PKCE flow: ?code= in query string
     const params = new URLSearchParams(window.location.search)
     const code = params.get("code")
 
@@ -24,33 +24,38 @@ export default function AuthCallbackPage() {
       return
     }
 
-    // Implicit flow: #access_token= in hash — supabase client picks it up automatically
-    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
-      if (data.session) {
-        router.replace("/cedis")
-        return
-      }
+    // Implicit flow: hash token — supabase client auto-detects #access_token
+    // Give it time to process the hash and fire the auth event
+    let done = false
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (event: AuthChangeEvent, session: Session | null) => {
-          if (session) {
-            subscription.unsubscribe()
-            router.replace("/cedis")
-          } else if (event === "SIGNED_OUT") {
-            subscription.unsubscribe()
-            router.replace("/login?error=auth_failed")
-          }
+    const redirect = (session: Session | null) => {
+      if (done) return
+      done = true
+      subscription.unsubscribe()
+      router.replace(session ? "/cedis" : "/login?error=auth_failed")
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event: AuthChangeEvent, session: Session | null) => {
+        // SIGNED_IN, INITIAL_SESSION with session, or TOKEN_REFRESHED = success
+        if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
+          redirect(session)
         }
-      )
+        // Do NOT redirect on SIGNED_OUT — it fires as initial event before hash is processed
+      }
+    )
 
-      // Fallback: 5s timeout
-      setTimeout(() => {
-        subscription.unsubscribe()
-        supabase.auth.getSession().then(({ data: d }: { data: { session: Session | null } }) => {
-          router.replace(d.session ? "/cedis" : "/login?error=auth_failed")
-        })
-      }, 5000)
-    })
+    // Fallback: 10s — if still no session, check once and redirect accordingly
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.auth.getSession()
+      redirect(data.session)
+    }, 10000)
+
+    return () => {
+      done = true
+      clearTimeout(timer)
+      subscription.unsubscribe()
+    }
   }, [router])
 
   return (
