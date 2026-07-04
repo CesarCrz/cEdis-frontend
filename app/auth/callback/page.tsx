@@ -15,7 +15,7 @@ export default function AuthCallbackPage() {
     const code = params.get("code")
 
     if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }: { error: { message: string } | null }) => {
         if (error) {
           router.replace("/login?error=auth_failed")
         } else {
