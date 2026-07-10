@@ -2,7 +2,17 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useCedisStore } from "@/store/cedis-store"
+import { getCedisList } from "@/lib/api/cedis"
+
+export function useCedisList() {
+  return useQuery({
+    queryKey: ["cedis-list"],
+    queryFn: getCedisList,
+    staleTime: 5 * 60 * 1000,
+  })
+}
 
 export function useCedis() {
   const params = useParams()

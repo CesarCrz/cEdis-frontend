@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Navbar } from "@/components/layout/navbar"
@@ -9,7 +9,7 @@ import { useCedisStore } from "@/store/cedis-store"
 import { useAuth } from "@/hooks/use-auth"
 import type { Role } from "@/lib/constants"
 import type { Cedis } from "@/types/app.types"
-import { getCedisList } from "@/lib/api/cedis"
+import { useCedisList } from "@/hooks/use-cedis"
 
 interface AppShellLayoutProps {
   children: React.ReactNode
@@ -21,20 +21,23 @@ export default function AppShellLayout({
   params,
 }: AppShellLayoutProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, loading } = useAuth()
   const { setActiveCedis } = useCedisStore()
 
   const [cedisId, setCedisId] = useState<string | null>(null)
   const [role, setRole] = useState<Role>("viewer")
-  const [cedisList, setCedisList] = useState<Cedis[]>([])
+  const [roleLoaded, setRoleLoaded] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const { data: cedisRes } = useCedisList()
+  const cedisList: Cedis[] = cedisRes?.data ?? []
 
   useEffect(() => {
     params.then(({ cedisId: id }) => {
       setCedisId(id)
-      setActiveCedis(id)
     })
-  }, [params, setActiveCedis])
+  }, [params])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -43,20 +46,24 @@ export default function AppShellLayout({
   }, [user, loading, router])
 
   useEffect(() => {
-    if (!user) return
-    getCedisList().then(({ data }) => {
-      if (data) {
-        setCedisList(data)
-        const found = data.find((c) => c.id === cedisId)
-        if (found) setActiveCedis(found.id, found.nombre)
-      }
-    })
-    // Role would be fetched from the backend in a real scenario.
-    // Default to operator so viewer restriction only applies when set explicitly.
-    setRole("operator")
-  }, [user, cedisId, setActiveCedis])
+    if (!user || !cedisId || cedisList.length === 0) return
+    const found = cedisList.find((c) => c.id === cedisId)
+    const r = (found?.my_role ?? "viewer") as Role
+    if (found) setActiveCedis(found.id, found.nombre, r)
+    setRole(r)
+    setRoleLoaded(true)
+  }, [user, cedisId, cedisList, setActiveCedis])
 
-  if (loading || !user || !cedisId) {
+  // Viewer can only access /inventario — only enforce after role is confirmed
+  useEffect(() => {
+    if (!roleLoaded || role !== "viewer" || !cedisId || !pathname) return
+    const allowed = `/${cedisId}/inventario`
+    if (!pathname.startsWith(allowed)) {
+      router.replace(allowed)
+    }
+  }, [roleLoaded, role, cedisId, pathname, router])
+
+  if (loading || !user || !cedisId || !roleLoaded) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />

@@ -1,12 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useParams } from "next/navigation"
-import { Trash2, Plus, Search } from "lucide-react"
+import { Check, ChevronsUpDown, Plus, PlusCircle, Trash2, Search } from "lucide-react"
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
+import { KbdShortcut } from "@/components/common/kbd-shortcut"
 import { toast } from "sonner"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 
 import { useMermas, useCreateMerma } from "@/hooks/use-mermas"
 import { useInsumos } from "@/hooks/use-insumos"
@@ -15,26 +14,32 @@ import { PageHeader } from "@/components/common/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { cn } from "@/lib/utils"
 import { formatDate } from "@/lib/utils/format"
 import type { Merma } from "@/types/app.types"
 
-const createMermaSchema = z.object({
-  insumo_id: z.string().uuid("Selecciona un insumo"),
-  cantidad: z.number().positive("Cantidad debe ser mayor a 0"),
-  unidad_id: z.string().uuid("Selecciona una unidad"),
-  motivo: z.string().min(1, "Motivo requerido").max(500),
-})
+interface MermaRow {
+  id: string
+  insumo_id: string
+  cantidad: string
+  unidad_id: string
+}
 
-type FormValues = z.infer<typeof createMermaSchema>
+function makeRow(): MermaRow {
+  return { id: crypto.randomUUID(), insumo_id: "", cantidad: "", unidad_id: "" }
+}
 
 export default function MermasPage() {
   const { cedisId } = useParams<{ cedisId: string }>()
   const [search, setSearch] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
+  useKeyboardShortcut("n", useCallback(() => setModalOpen(true), []), { enabled: !modalOpen })
 
   const { data: res, isLoading } = useMermas(cedisId)
   const mermas: Merma[] = (res?.data as Merma[] | undefined) ?? []
@@ -55,7 +60,7 @@ export default function MermasPage() {
         />
         <Button onClick={() => setModalOpen(true)} size="sm" className="shrink-0">
           <Plus className="h-4 w-4 mr-1.5" aria-hidden />
-          Registrar merma
+          Registrar merma<KbdShortcut keys="n" />
         </Button>
       </div>
 
@@ -166,140 +171,219 @@ function MermaModal({
   const { data: insumosRes } = useInsumos(cedisId)
   const { data: uomRes } = useUom()
 
-  const insumos = (insumosRes?.data as { id: string; nombre: string; sku?: string | null }[] | undefined) ?? []
+  const insumos = (insumosRes?.data as { id: string; nombre: string; sku?: string | null; unidad_id?: string | null }[] | undefined) ?? []
   const uoms = uomRes?.data ?? []
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(createMermaSchema),
-    defaultValues: { insumo_id: "", cantidad: undefined as unknown as number, unidad_id: "", motivo: "" },
-  })
+  const [rows, setRows] = useState<MermaRow[]>([makeRow()])
+  const [motivo, setMotivo] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [openRowId, setOpenRowId] = useState<string | null>(null)
 
-  async function onSubmit(values: FormValues) {
-    const { data, error } = await createMerma.mutateAsync(values)
-    if (error) {
-      toast.error(error)
-      return
+  function handleClose() {
+    setRows([makeRow()])
+    setMotivo("")
+    setOpenRowId(null)
+    onClose()
+  }
+
+  function addRow() {
+    const r = makeRow()
+    setRows((prev) => [...prev, r])
+    setOpenRowId(r.id)
+  }
+
+  function removeRow(id: string) {
+    setRows((prev) => {
+      const next = prev.filter((r) => r.id !== id)
+      return next.length === 0 ? [makeRow()] : next
+    })
+    if (openRowId === id) setOpenRowId(null)
+  }
+
+  const updateRow = useCallback((id: string, patch: Partial<MermaRow>) => {
+    setRows((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r))
+  }, [])
+
+  function usedIds(currentId: string) {
+    return new Set(rows.filter((r) => r.id !== currentId && r.insumo_id).map((r) => r.insumo_id))
+  }
+
+  async function handleSubmit() {
+    if (!motivo.trim()) { toast.error("Motivo requerido"); return }
+    const valid = rows.filter((r) => r.insumo_id && r.cantidad !== "" && r.unidad_id)
+    if (valid.length === 0) { toast.error("Agrega al menos un insumo"); return }
+    for (const r of valid) {
+      const val = parseFloat(r.cantidad)
+      if (isNaN(val) || val <= 0) {
+        const ins = insumos.find((i) => i.id === r.insumo_id)
+        toast.error(`Cantidad inválida para ${ins?.nombre ?? r.insumo_id}`)
+        return
+      }
     }
-    if (data) {
-      toast.success("Merma registrada")
-      form.reset()
-      onClose()
+
+    setSubmitting(true)
+    let errors = 0
+    for (const r of valid) {
+      const { error } = await createMerma.mutateAsync({
+        insumo_id: r.insumo_id,
+        cantidad: parseFloat(r.cantidad),
+        unidad_id: r.unidad_id,
+        motivo: motivo.trim(),
+      })
+      if (error) {
+        const ins = insumos.find((i) => i.id === r.insumo_id)
+        toast.error(`${ins?.nombre ?? "Insumo"}: ${error}`)
+        errors++
+      }
+    }
+    setSubmitting(false)
+    if (errors === 0) {
+      toast.success(valid.length === 1 ? "Merma registrada" : `${valid.length} mermas registradas`)
+      handleClose()
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Registrar merma</DialogTitle>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="insumo_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Insumo</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar insumo..." />
-                      </SelectTrigger>
-                    </FormControl>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Motivo <span className="text-destructive">*</span></Label>
+            <Textarea
+              placeholder="Describe la causa de la merma (aplica a todos los insumos)..."
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-[1fr_150px_120px_36px] gap-2 px-1">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Insumo</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Unidad</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cantidad</span>
+            <span />
+          </div>
+
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            {rows.map((row) => {
+              const taken = usedIds(row.id)
+              const selectedInsumo = insumos.find((i) => i.id === row.insumo_id)
+
+              return (
+                <div key={row.id} className="grid grid-cols-[1fr_150px_120px_36px] gap-2 items-start">
+                  {/* Insumo combobox */}
+                  <Popover
+                    open={openRowId === row.id}
+                    onOpenChange={(o) => setOpenRowId(o ? row.id : null)}
+                  >
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring",
+                          !selectedInsumo && "text-muted-foreground"
+                        )}
+                      >
+                        <span className="truncate">
+                          {selectedInsumo ? selectedInsumo.nombre : "Buscar insumo..."}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar insumo..." />
+                        <CommandList>
+                          <CommandEmpty>Sin resultados.</CommandEmpty>
+                          <CommandGroup>
+                            {insumos
+                              .filter((ins) => !taken.has(ins.id) || ins.id === row.insumo_id)
+                              .map((ins) => (
+                                <CommandItem
+                                  key={ins.id}
+                                  value={ins.nombre}
+                                  onSelect={() => {
+                                    updateRow(row.id, {
+                                      insumo_id: ins.id,
+                                      unidad_id: ins.unidad_id ?? "",
+                                    })
+                                    setOpenRowId(null)
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4 shrink-0", row.insumo_id === ins.id ? "opacity-100" : "opacity-0")} />
+                                  <span className="flex-1 truncate">{ins.nombre}</span>
+                                  {ins.sku && <span className="ml-2 text-xs text-muted-foreground shrink-0">{ins.sku}</span>}
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Unidad */}
+                  <Select
+                    value={row.unidad_id}
+                    onValueChange={(v) => updateRow(row.id, { unidad_id: v })}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Unidad..." />
+                    </SelectTrigger>
                     <SelectContent>
-                      {insumos.map((i) => (
-                        <SelectItem key={i.id} value={i.id}>
-                          {i.nombre}
-                          {i.sku && (
-                            <span className="ml-1 text-muted-foreground text-xs">({i.sku})</span>
-                          )}
+                      {uoms.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.simbolo} — {u.nombre}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="cantidad"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cantidad</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        placeholder="0.00"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  {/* Cantidad */}
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    placeholder="0"
+                    value={row.cantidad}
+                    onChange={(e) => updateRow(row.id, { cantidad: e.target.value })}
+                  />
 
-              <FormField
-                control={form.control}
-                name="unidad_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unidad</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Unidad..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {uoms.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {u.simbolo} — {u.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeRow(row.id)}
+                    disabled={rows.length === 1}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
 
-            <FormField
-              control={form.control}
-              name="motivo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Motivo</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe la causa de la merma..."
-                      rows={3}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <button
+            type="button"
+            onClick={addRow}
+            className="flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+          >
+            <PlusCircle className="h-4 w-4" aria-hidden />
+            Agregar insumo
+          </button>
+        </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={createMerma.isPending}>
-                {createMerma.isPending ? "Guardando..." : "Registrar"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={submitting}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "Guardando..." : `Registrar merma${rows.filter((r) => r.insumo_id).length > 1 ? "s" : ""}`}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

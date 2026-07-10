@@ -4,11 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "@/lib/api/clientes"
 import type { ClientesParams } from "@/lib/api/clientes"
 
+const STALE_5MIN = 5 * 60 * 1000
+
 export function useClientes(cedisId: string, params?: ClientesParams) {
   return useQuery({
     queryKey: ["clientes", cedisId, params],
     queryFn: () => api.getClientes(cedisId, params),
     enabled: !!cedisId,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -17,6 +20,7 @@ export function useCliente(cedisId: string, id: string) {
     queryKey: ["cliente", cedisId, id],
     queryFn: () => api.getCliente(cedisId, id),
     enabled: !!id && !!cedisId,
+    staleTime: STALE_5MIN,
   })
 }
 

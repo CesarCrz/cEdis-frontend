@@ -3,11 +3,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "@/lib/api/categorias"
 
+const STALE_5MIN = 5 * 60 * 1000
+
 export function useCategorias(cedisId: string) {
   return useQuery({
     queryKey: ["categorias", cedisId],
     queryFn: () => api.getCategorias(cedisId),
     enabled: !!cedisId,
+    staleTime: STALE_5MIN,
   })
 }
 

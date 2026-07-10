@@ -82,14 +82,14 @@ export function ProveedorModal({
         data: payload,
       })
       if (res.error) {
-        toast.error("Error al actualizar proveedor")
+        toast.error(res.error)
         return
       }
       toast.success("Proveedor actualizado exitosamente")
     } else {
       const res = await createProveedor.mutateAsync(payload)
       if (res.error) {
-        toast.error("Error al crear proveedor")
+        toast.error(res.error)
         return
       }
       toast.success("Proveedor creado exitosamente")

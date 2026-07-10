@@ -42,6 +42,7 @@ function getNavGroups(cedisId: string): NavGroup[] {
           icon: LayoutDashboard,
           label: "Dashboard",
           href: `/${cedisId}`,
+          roles: ["owner", "admin", "operator"],
         },
       ],
     },
@@ -81,6 +82,7 @@ function getNavGroups(cedisId: string): NavGroup[] {
           icon: Warehouse,
           label: "Inventario",
           href: `/${cedisId}/inventario`,
+          roles: ["owner", "admin", "operator", "viewer"],
         },
         {
           icon: BookOpen,

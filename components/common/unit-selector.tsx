@@ -9,23 +9,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { getUnitsByTipo, UNITS, type UnitTipo } from "@/lib/utils/unit-conversion"
+import { useUnidadesMedida } from "@/hooks/use-uom"
+import type { UnidadMedida } from "@/types/app.types"
 
 interface UnitSelectorProps {
   value: string
   onChange: (value: string) => void
-  tipo?: UnitTipo
+  tipo?: UnidadMedida["tipo"]
   disabled?: boolean
   placeholder?: string
 }
 
-const TIPO_LABELS: Record<UnitTipo, string> = {
+const TIPO_LABELS: Record<UnidadMedida["tipo"], string> = {
   peso: "Peso",
   volumen: "Volumen",
   unidad: "Unidad",
 }
 
-const TIPOS: UnitTipo[] = ["peso", "volumen", "unidad"]
+const TIPO_ORDER: UnidadMedida["tipo"][] = ["peso", "volumen", "unidad"]
 
 export function UnitSelector({
   value,
@@ -34,27 +35,38 @@ export function UnitSelector({
   disabled = false,
   placeholder = "Unidad",
 }: UnitSelectorProps) {
-  const grouped = tipo
-    ? { [tipo]: getUnitsByTipo(tipo) }
-    : Object.fromEntries(TIPOS.map((t) => [t, getUnitsByTipo(t)]))
+  const { data: res, isLoading } = useUnidadesMedida()
+  const all: UnidadMedida[] = res?.data ?? []
+
+  const filtered = tipo ? all.filter((u) => u.tipo === tipo) : all
+  const grouped = TIPO_ORDER.reduce<Record<string, UnidadMedida[]>>((acc, t) => {
+    const units = filtered.filter((u) => u.tipo === t)
+    if (units.length) acc[t] = units
+    return acc
+  }, {})
+
+  const selected = all.find((u) => u.id === value)
 
   return (
-    <Select value={value} onValueChange={onChange} disabled={disabled}>
+    <Select value={value} onValueChange={onChange} disabled={disabled || isLoading}>
       <SelectTrigger aria-label="Seleccionar unidad de medida">
-        <SelectValue placeholder={placeholder}>
-          {value ? UNITS[value]?.symbol ?? value : undefined}
+        <SelectValue placeholder={isLoading ? "Cargando..." : placeholder}>
+          {selected ? (
+            <span>
+              <span className="font-mono-data">{selected.simbolo}</span>
+              <span className="ml-1 text-muted-foreground text-xs">{selected.nombre}</span>
+            </span>
+          ) : undefined}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {Object.entries(grouped).map(([t, units]) => (
           <SelectGroup key={t}>
-            <SelectLabel>{TIPO_LABELS[t as UnitTipo]}</SelectLabel>
+            <SelectLabel>{TIPO_LABELS[t as UnidadMedida["tipo"]]}</SelectLabel>
             {units.map((unit) => (
-              <SelectItem key={unit.symbol} value={unit.symbol}>
-                <span className="font-mono-data">{unit.symbol}</span>
-                <span className="ml-2 text-muted-foreground text-xs">
-                  {unit.name}
-                </span>
+              <SelectItem key={unit.id} value={unit.id}>
+                <span className="font-mono-data">{unit.simbolo}</span>
+                <span className="ml-2 text-muted-foreground text-xs">{unit.nombre}</span>
               </SelectItem>
             ))}
           </SelectGroup>

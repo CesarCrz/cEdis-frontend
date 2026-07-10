@@ -3,8 +3,8 @@ import type { Insumo } from "@/types/app.types"
 
 export interface InsumosParams {
   search?: string
-  categoria?: string
-  proveedor?: string
+  categoria_id?: string
+  proveedor_id?: string
   alerta?: string
   page?: number
   pageSize?: number

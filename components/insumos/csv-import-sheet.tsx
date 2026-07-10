@@ -21,15 +21,27 @@ interface CsvImportSheetProps {
   cedisId: string
 }
 
-const CSV_HEADERS = ["nombre", "sku", "unidad", "costo_unitario", "stock_minimo", "stock_inicial"]
+const CSV_HEADERS = ["nombre", "sku", "unidad", "costo_unitario", "stock_minimo", "stock_inicial", "categoria", "proveedor"]
+
+const COLUMN_DOCS = [
+  { col: "nombre", req: true, desc: "Nombre del insumo", ejemplo: "Harina de trigo" },
+  { col: "unidad", req: true, desc: "Símbolo o nombre: g, kg, mL, L, pza", ejemplo: "kg" },
+  { col: "costo_unitario", req: true, desc: "Número positivo (precio por unidad)", ejemplo: "25.50" },
+  { col: "sku", req: false, desc: "Código único. Se genera automáticamente si se omite", ejemplo: "HARI-001" },
+  { col: "stock_minimo", req: false, desc: "Cantidad mínima de alerta (default 0)", ejemplo: "10" },
+  { col: "stock_inicial", req: false, desc: "Stock con el que se crea el insumo (default 0)", ejemplo: "50" },
+  { col: "categoria", req: false, desc: "Se crea automáticamente si no existe", ejemplo: "Harinas" },
+  { col: "proveedor", req: false, desc: "Se crea automáticamente si no existe", ejemplo: "Distribuidora XYZ" },
+]
 
 function downloadTemplate() {
   const rows = [
     CSV_HEADERS.join(","),
-    "Harina de trigo,HARI-001,kg,25.50,10,50",
-    "Azucar,AZUC-001,kg,18.00,5,25",
+    '"Harina de trigo","HARI-001","kg","25.50","10","50","Harinas","Distribuidora XYZ"',
+    '"Azucar","AZUC-001","kg","18.00","5","25","Abarrotes",""',
+    '"Aceite vegetal","","L","32.00","2","10","Aceites",""',
   ]
-  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" })
+  const blob = new Blob(["﻿" + rows.join("\n")], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
@@ -38,13 +50,15 @@ function downloadTemplate() {
   URL.revokeObjectURL(url)
 }
 
+interface ImportError { row: number; message: string }
+
 export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<Record<string, string>[]>([])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [importResult, setImportResult] = useState<{
     imported: number
-    errors: string[]
+    errors: ImportError[]
   } | null>(null)
   const importMutation = useImportInsumosCsv(cedisId)
 
@@ -90,7 +104,7 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
       return
     }
     if (res.data) {
-      setImportResult(res.data)
+      setImportResult(res.data as unknown as { imported: number; errors: ImportError[] })
       toast.success(`${res.data.imported} insumos importados exitosamente`)
     }
   }
@@ -129,9 +143,30 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
               <Download className="h-4 w-4 mr-2" aria-hidden />
               Descargar plantilla.csv
             </Button>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Columnas: {CSV_HEADERS.join(", ")}
-            </p>
+
+            <div className="mt-3 rounded-md border border-border overflow-hidden">
+              <table className="text-xs w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground">Columna</th>
+                    <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground">Req.</th>
+                    <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground">Descripción</th>
+                    <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground">Ejemplo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {COLUMN_DOCS.map((d) => (
+                    <tr key={d.col} className="border-t border-border">
+                      <td className="px-2 py-1.5 font-mono text-foreground">{d.col}</td>
+                      <td className="px-2 py-1.5 text-center">{d.req ? <span className="text-destructive font-semibold">✱</span> : <span className="text-muted-foreground">—</span>}</td>
+                      <td className="px-2 py-1.5 text-muted-foreground">{d.desc}</td>
+                      <td className="px-2 py-1.5 font-mono text-muted-foreground">{d.ejemplo}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">Límite: 1,000 filas · 5 MB · solo .csv</p>
           </section>
 
           {/* Paso 2: Upload */}
@@ -249,9 +284,9 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
                     {importResult.errors.length} errores
                   </p>
                   <ul className="text-xs text-muted-foreground space-y-0.5 max-h-40 overflow-y-auto">
-                    {importResult.errors.map((err, i) => (
+                    {importResult.errors.map((e, i) => (
                       <li key={i} className="font-mono">
-                        {err}
+                        Fila {e.row}: {e.message}
                       </li>
                     ))}
                   </ul>

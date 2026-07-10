@@ -30,6 +30,8 @@ import {
   useEntregarVenta,
   useCancelVenta,
 } from "@/hooks/use-ventas"
+import { useInsumos } from "@/hooks/use-insumos"
+import { useUnidadesMedida } from "@/hooks/use-uom"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format"
 
 export default function VentaDetailPage() {
@@ -41,6 +43,22 @@ export default function VentaDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
 
   const { data: res, isLoading } = useVenta(cedisId, id)
+  const { data: insumosRes } = useInsumos(cedisId, { pageSize: 1000 })
+  const { data: uomRes } = useUnidadesMedida()
+  const insumos = insumosRes?.data ?? []
+  const unidades = uomRes?.data ?? []
+
+  function getPrecioBase(insumoId: string, selectedUnitId: string, storedPrice: number): { precio: number; simbolo: string } {
+    const ins = insumos.find(i => i.id === insumoId)
+    const selectedUnit = unidades.find(u => u.id === selectedUnitId)
+    const baseUnit = ins ? unidades.find(u => u.id === ins.unidad_id) : undefined
+    if (!selectedUnit || !baseUnit || selectedUnit.id === baseUnit.id) {
+      return { precio: storedPrice, simbolo: selectedUnit?.simbolo ?? "" }
+    }
+    const precioBase = storedPrice * (Number(baseUnit.factor) / Number(selectedUnit.factor))
+    return { precio: precioBase, simbolo: baseUnit.simbolo }
+  }
+
   const confirmar = useConfirmarVenta(cedisId)
   const entregar = useEntregarVenta(cedisId)
   const cancel = useCancelVenta(cedisId)
@@ -218,18 +236,22 @@ export default function VentaDetailPage() {
               const sku =
                 "insumo" in item && item.insumo ? item.insumo.sku : null
               const unidadRaw = "unidad" in item ? item.unidad : undefined
-              const unidad = unidadRaw
+              const unidadSimbolo = unidadRaw
                 ? typeof unidadRaw === "object"
                   ? (unidadRaw as { simbolo: string }).simbolo
                   : (unidadRaw as string)
                 : "unidad_id" in item
                 ? (item as { unidad_id: string }).unidad_id
                 : ""
-              const precio =
-                "precio_unitario" in item ? item.precio_unitario : 0
+              const storedPrecio = "precio_unitario" in item ? Number(item.precio_unitario) : 0
               const subtotal =
                 (item as { subtotal?: number }).subtotal ??
-                item.cantidad * precio
+                item.cantidad * storedPrecio
+
+              const insumoId = "insumo_id" in item ? (item.insumo_id ?? "") : ""
+              const unitId = "unidad_id" in item ? (item as { unidad_id: string }).unidad_id : ""
+              const { precio: precioBase, simbolo: baseSimb } = getPrecioBase(insumoId, unitId, storedPrecio)
+              const sameUnit = baseSimb === unidadSimbolo || !baseSimb
 
               return (
                 <TableRow key={item.id}>
@@ -246,9 +268,12 @@ export default function VentaDetailPage() {
                   <TableCell className="text-right font-mono">
                     {item.cantidad}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{unidad}</TableCell>
+                  <TableCell className="font-mono text-xs">{unidadSimbolo}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(precio)}
+                    <span>{formatCurrency(precioBase)}</span>
+                    {!sameUnit && (
+                      <span className="text-muted-foreground text-xs ml-1">/{baseSimb}</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono font-medium">
                     {formatCurrency(subtotal)}

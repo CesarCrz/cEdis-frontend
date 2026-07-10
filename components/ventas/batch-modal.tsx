@@ -38,6 +38,7 @@ import { useClientes } from "@/hooks/use-clientes"
 import { useInsumos } from "@/hooks/use-insumos"
 import { useUom } from "@/hooks/use-uom"
 import { formatCurrency } from "@/lib/utils/format"
+import { cn } from "@/lib/utils"
 import type { Cliente } from "@/types/app.types"
 
 interface BatchModalProps {
@@ -61,6 +62,21 @@ export function BatchModal({ open, onClose, cedisId }: BatchModalProps) {
   const clientes = clientesRes?.data ?? []
   const insumos = insumosRes?.data ?? []
   const unidades = uomRes?.data ?? []
+
+  function getPrecioAjustado(insumoId: string, targetUnitId: string): number {
+    const ins = insumos.find((i) => i.id === insumoId)
+    if (!ins || ins.costo_unitario == null) return 0
+    const baseUnit = unidades.find((u) => u.id === ins.unidad_id)
+    const targetUnit = unidades.find((u) => u.id === targetUnitId)
+    if (!baseUnit || !targetUnit) return Number(ins.costo_unitario)
+    return Number(ins.costo_unitario) * (Number(targetUnit.factor) / Number(baseUnit.factor))
+  }
+
+  function getInsumoUnitTipo(insumoId: string) {
+    const ins = insumos.find((i) => i.id === insumoId)
+    if (!ins) return undefined
+    return unidades.find((u) => u.id === ins.unidad_id)?.tipo
+  }
 
   const filteredClientes = clientes.filter(
     (c: Cliente) =>
@@ -219,7 +235,12 @@ export function BatchModal({ open, onClose, cedisId }: BatchModalProps) {
                   Define los items que se incluiran en cada ticket.
                 </p>
 
-                {fields.map((field, index) => (
+                {fields.map((field, index) => {
+                  const selectedInsumo = insumos.find((i) => i.id === watchedItems[index]?.insumo_id)
+                  const unitTipo = getInsumoUnitTipo(watchedItems[index]?.insumo_id)
+                  const filteredUnidades = unitTipo ? unidades.filter(u => u.tipo === unitTipo) : unidades
+
+                  return (
                   <div
                     key={field.id}
                     className="grid grid-cols-[1fr_80px_120px_120px_36px] gap-2 items-start"
@@ -232,7 +253,17 @@ export function BatchModal({ open, onClose, cedisId }: BatchModalProps) {
                           {index === 0 && (
                             <FormLabel className="text-xs">Insumo</FormLabel>
                           )}
-                          <Select value={f.value} onValueChange={f.onChange}>
+                          <Select
+                            value={f.value}
+                            onValueChange={(val) => {
+                              f.onChange(val)
+                              const ins = insumos.find(i => i.id === val)
+                              if (ins) {
+                                form.setValue(`items.${index}.unidad_id`, ins.unidad_id ?? "")
+                                form.setValue(`items.${index}.precio_unitario`, ins.costo_unitario != null ? Number(ins.costo_unitario) : 0)
+                              }
+                            }}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Seleccionar..." />
@@ -246,6 +277,14 @@ export function BatchModal({ open, onClose, cedisId }: BatchModalProps) {
                               ))}
                             </SelectContent>
                           </Select>
+                          {selectedInsumo && (
+                            <p className="text-xs mt-0.5 pl-0.5">
+                              <span className="text-muted-foreground">CEDIS: </span>
+                              <span className={cn("font-mono font-medium", selectedInsumo.stock_actual <= selectedInsumo.stock_minimo ? "text-destructive" : "text-emerald-600 dark:text-emerald-400")}>
+                                {selectedInsumo.stock_actual} {unidades.find(u => u.id === selectedInsumo.unidad_id)?.simbolo ?? ""}
+                              </span>
+                            </p>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
@@ -284,14 +323,23 @@ export function BatchModal({ open, onClose, cedisId }: BatchModalProps) {
                           {index === 0 && (
                             <FormLabel className="text-xs">Unidad</FormLabel>
                           )}
-                          <Select value={f.value} onValueChange={f.onChange}>
+                          <Select
+                            value={f.value}
+                            onValueChange={(newUnitId) => {
+                              f.onChange(newUnitId)
+                              const insumoId = watchedItems[index]?.insumo_id
+                              if (insumoId) {
+                                form.setValue(`items.${index}.precio_unitario`, getPrecioAjustado(insumoId, newUnitId))
+                              }
+                            }}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Unidad" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {unidades.map((u) => (
+                              {filteredUnidades.map((u) => (
                                 <SelectItem key={u.id} value={u.id}>
                                   {u.simbolo}
                                 </SelectItem>
@@ -348,7 +396,8 @@ export function BatchModal({ open, onClose, cedisId }: BatchModalProps) {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
 
                 <Button
                   type="button"

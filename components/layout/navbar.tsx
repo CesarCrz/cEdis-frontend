@@ -23,12 +23,8 @@ interface NavbarProps {
   onMenuToggle?: () => void
 }
 
-export function Navbar({
-  currentCedisId,
-  onMenuToggle,
-}: NavbarProps) {
+export function Navbar({ currentCedisId, onMenuToggle }: NavbarProps) {
   const { user, signOut } = useAuth()
-
   const userInitial = user?.email?.charAt(0).toUpperCase() ?? "U"
 
   return (
@@ -36,7 +32,7 @@ export function Navbar({
       data-navbar
       className="h-14 border-b border-border bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 shrink-0"
     >
-      <div className="flex h-full items-center gap-2 px-5">
+      <div className="flex h-full items-center gap-2 px-3 md:px-5">
         <Button
           variant="ghost"
           size="icon"
@@ -52,14 +48,14 @@ export function Navbar({
           aria-hidden
         />
 
+        {/* Breadcrumb — includes CEDIS switcher inline */}
         <div className="flex-1 min-w-0">
           <Breadcrumb />
         </div>
 
+        {/* Right actions */}
         <div className="flex items-center gap-0.5">
-          {currentCedisId && (
-            <GlobalSearch cedisId={currentCedisId} />
-          )}
+          {currentCedisId && <GlobalSearch cedisId={currentCedisId} />}
 
           <ThemeToggle />
 
@@ -76,6 +72,7 @@ export function Navbar({
             </Button>
           )}
 
+          {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

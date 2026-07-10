@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useParams } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Printer, X } from "lucide-react"
+import { Printer, Search, X } from "lucide-react"
 
 import { PageHeader } from "@/components/common/page-header"
 import { DataTable } from "@/components/common/data-table"
@@ -72,6 +72,7 @@ function getDefaultDesde() {
 export default function KardexPage() {
   const { cedisId } = useParams<{ cedisId: string }>()
 
+  const [search, setSearch] = useState("")
   const [tipoFilter, setTipoFilter] = useState("")
   const [clienteFilter, setClienteFilter] = useState("")
   const [desde, setDesde] = useState(getDefaultDesde)
@@ -91,12 +92,24 @@ export default function KardexPage() {
   const { data: res, isLoading } = useKardex(cedisId, filters)
   const { data: clientesRes } = useClientes(cedisId)
 
-  const entradas = res?.data ?? []
+  const rawEntradas = res?.data ?? []
   const clientes = clientesRes?.data ?? []
 
-  const hasFilters = !!tipoFilter || !!clienteFilter
+  const entradas = search.trim()
+    ? rawEntradas.filter((e) => {
+        const q = search.toLowerCase()
+        return (
+          e.insumo?.nombre?.toLowerCase().includes(q) ||
+          e.insumo?.sku?.toLowerCase().includes(q) ||
+          e.notas?.toLowerCase().includes(q)
+        )
+      })
+    : rawEntradas
+
+  const hasFilters = !!search || !!tipoFilter || !!clienteFilter
 
   function clearFilters() {
+    setSearch("")
     setTipoFilter("")
     setClienteFilter("")
     setDesde(getDefaultDesde())
@@ -218,6 +231,17 @@ export default function KardexPage() {
         />
 
         <div data-no-print className="mb-4 flex flex-wrap gap-3 items-center">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden />
+            <Input
+              placeholder="Buscar insumo, SKU o nota…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 w-[220px]"
+              aria-label="Buscar en kardex"
+            />
+          </div>
+
           <Select
             value={tipoFilter || "todos"}
             onValueChange={(v) => setTipoFilter(v === "todos" ? "" : v)}

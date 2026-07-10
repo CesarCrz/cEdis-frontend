@@ -1,13 +1,17 @@
 "use client"
 
-import { useState } from "react"
-import { useParams } from "next/navigation"
+import { useState, useCallback } from "react"
+import { useParams, useRouter } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
-import { PlusCircle, X } from "lucide-react"
+import { PlusCircle, Trash2, X } from "lucide-react"
+import { toast } from "sonner"
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
+import { KbdShortcut } from "@/components/common/kbd-shortcut"
 
 import { PageHeader } from "@/components/common/page-header"
 import { DataTable } from "@/components/common/data-table"
 import { FolioCell } from "@/components/common/folio-cell"
+import { ConfirmDialog } from "@/components/common/confirm-dialog"
 import { VentaDeclaradaModal } from "@/components/ventas-declaradas/venta-declarada-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useVentasDeclaradas } from "@/hooks/use-ventas-declaradas"
+import { useVentasDeclaradas, useDeleteVentaDeclarada } from "@/hooks/use-ventas-declaradas"
 import { useClientes } from "@/hooks/use-clientes"
 import { useCanales } from "@/hooks/use-canales"
 import { formatDate } from "@/lib/utils/format"
@@ -26,12 +30,17 @@ import type { VentaDeclarada } from "@/types/app.types"
 
 export default function VentasDeclaradasPage() {
   const { cedisId } = useParams<{ cedisId: string }>()
+  const router = useRouter()
 
   const [clienteFilter, setClienteFilter] = useState("")
   const [canalFilter, setCanalFilter] = useState("")
   const [desde, setDesde] = useState("")
   const [hasta, setHasta] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<VentaDeclarada | null>(null)
+  useKeyboardShortcut("n", useCallback(() => setModalOpen(true), []), { enabled: !modalOpen })
+
+  const deleteVenta = useDeleteVentaDeclarada(cedisId)
 
   const filters = {
     ...(clienteFilter && clienteFilter !== "__todos__"
@@ -51,6 +60,14 @@ export default function VentasDeclaradasPage() {
   const ventas = res?.data ?? []
   const clientes = clientesRes?.data ?? []
   const canales = canalesRes?.data ?? []
+
+  async function handleDelete() {
+    if (!confirmDelete) return
+    const res = await deleteVenta.mutateAsync(confirmDelete.id)
+    if (res.error) { toast.error(res.error); return }
+    toast.success("Declaracion eliminada")
+    setConfirmDelete(null)
+  }
 
   const hasFilters = !!clienteFilter || !!canalFilter || !!desde || !!hasta
 
@@ -131,6 +148,29 @@ export default function VentasDeclaradasPage() {
         )
       },
     },
+    {
+      id: "acciones",
+      header: "Acciones",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/${cedisId}/ventas-declaradas/${row.original.id}`)}
+          >
+            Ver
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => setConfirmDelete(row.original)}
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+          </Button>
+        </div>
+      ),
+    },
   ]
 
   return (
@@ -141,7 +181,7 @@ export default function VentasDeclaradasPage() {
         actions={
           <Button onClick={() => setModalOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-2" aria-hidden />
-            Nueva declaracion
+            Nueva declaracion<KbdShortcut keys="n" />
           </Button>
         }
       />
@@ -217,6 +257,16 @@ export default function VentasDeclaradasPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         cedisId={cedisId}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        title="Eliminar declaracion"
+        description={`¿Eliminar la declaracion de ${confirmDelete?.cliente?.nombre ?? ""}? Se eliminarán también las entradas del kardex asociadas.`}
+        confirmLabel="Eliminar"
+        loading={deleteVenta.isPending}
       />
     </div>
   )

@@ -73,14 +73,14 @@ export function ClienteModal({
         data: payload,
       })
       if (res.error) {
-        toast.error("Error al actualizar cliente")
+        toast.error(res.error)
         return
       }
       toast.success("Cliente actualizado exitosamente")
     } else {
       const res = await createCliente.mutateAsync(payload)
       if (res.error) {
-        toast.error("Error al crear cliente")
+        toast.error(res.error)
         return
       }
       toast.success("Cliente creado exitosamente")

@@ -8,7 +8,8 @@ export function useNotificaciones(cedisId: string) {
     queryKey: ["notificaciones", cedisId],
     queryFn: () => notificacionesApi.list(cedisId),
     enabled: !!cedisId,
-    refetchInterval: 60_000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   })
 }
 

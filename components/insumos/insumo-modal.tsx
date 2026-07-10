@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { UnitSelector } from "@/components/common/unit-selector"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { insumoSchema, type InsumoFormData } from "@/lib/validations/insumo"
 import { useCreateInsumo, useUpdateInsumo } from "@/hooks/use-insumos"
 import { useCategorias, useCreateCategoria } from "@/hooks/use-categorias"
@@ -134,14 +135,14 @@ export function InsumoModal({
         data: payload,
       })
       if (res.error) {
-        toast.error("Error al actualizar insumo")
+        toast.error(res.error)
         return
       }
       toast.success("Insumo actualizado exitosamente")
     } else {
       const res = await createInsumo.mutateAsync(payload)
       if (res.error) {
-        toast.error("Error al crear insumo")
+        toast.error(res.error)
         return
       }
       toast.success("Insumo creado exitosamente")
@@ -153,18 +154,19 @@ export function InsumoModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Editar insumo" : "Nuevo insumo"}
           </DialogTitle>
         </DialogHeader>
 
+        <div className="flex-1 min-h-0 overflow-y-auto">
         <Form {...form}>
           <form
             id="insumo-form"
             onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-4"
+            className="space-y-4 pb-2"
           >
             {/* Nombre */}
             <FormField
@@ -308,13 +310,14 @@ export function InsumoModal({
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
                         MXN $
                       </span>
-                      <Input
+                      <NumericInput
                         id="insumo-costo"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        className="pl-14 font-mono"
-                        {...field}
+                        decimals={2}
+                        className="pl-14"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
                       />
                     </div>
                   </FormControl>
@@ -333,12 +336,13 @@ export function InsumoModal({
                     Stock minimo
                   </FormLabel>
                   <FormControl>
-                    <Input
+                    <NumericInput
                       id="insumo-stock-min"
-                      type="number"
-                      min={0}
-                      className="font-mono"
-                      {...field}
+                      decimals={3}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
                     />
                   </FormControl>
                   <FormDescription>
@@ -360,12 +364,13 @@ export function InsumoModal({
                       Stock existente
                     </FormLabel>
                     <FormControl>
-                      <Input
+                      <NumericInput
                         id="insumo-stock-ini"
-                        type="number"
-                        min={0}
-                        className="font-mono"
-                        {...field}
+                        decimals={3}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
@@ -407,8 +412,9 @@ export function InsumoModal({
             />
           </form>
         </Form>
+        </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 pt-4 border-t shrink-0">
           <Button
             variant="outline"
             onClick={onClose}

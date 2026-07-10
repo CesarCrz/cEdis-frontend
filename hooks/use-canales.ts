@@ -14,7 +14,7 @@ export function useCanales(cedisId: string) {
 export function useCreateCanal(cedisId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { nombre: string; descripcion?: string }) =>
+    mutationFn: (data: { nombre: string; comision_pct?: number }) =>
       canalesApi.create(cedisId, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["canales", cedisId] }),
   })
@@ -28,7 +28,7 @@ export function useUpdateCanal(cedisId: string) {
       data,
     }: {
       id: string
-      data: { nombre?: string; descripcion?: string; activo?: boolean }
+      data: { nombre?: string; comision_pct?: number; activo?: boolean }
     }) => canalesApi.update(cedisId, id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["canales", cedisId] }),
   })

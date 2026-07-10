@@ -71,9 +71,11 @@ export default function ConfiguracionPage() {
 function CanalesTab({ cedisId }: { cedisId: string }) {
   const [editCanal, setEditCanal] = useState<CanalVenta | null>(null)
   const [newNombre, setNewNombre] = useState("")
+  const [newComision, setNewComision] = useState("")
   const [deleteCanal, setDeleteCanal] = useState<CanalVenta | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [createNombre, setCreateNombre] = useState("")
+  const [createComision, setCreateComision] = useState("")
 
   const { data: res, isLoading } = useCanales(cedisId)
   const createCanal = useCreateCanal(cedisId)
@@ -84,18 +86,24 @@ function CanalesTab({ cedisId }: { cedisId: string }) {
 
   async function handleCreate() {
     if (!createNombre.trim()) return
-    const r = await createCanal.mutateAsync({ nombre: createNombre.trim() })
+    const comision = parseFloat(createComision)
+    const r = await createCanal.mutateAsync({
+      nombre: createNombre.trim(),
+      comision_pct: isNaN(comision) ? 0 : comision,
+    })
     if (r.error) { toast.error(r.error); return }
     toast.success("Canal creado")
     setCreateNombre("")
+    setCreateComision("")
     setCreateOpen(false)
   }
 
   async function handleEdit() {
     if (!editCanal || !newNombre.trim()) return
+    const comision = parseFloat(newComision)
     const r = await updateCanal.mutateAsync({
       id: editCanal.id,
-      data: { nombre: newNombre.trim() },
+      data: { nombre: newNombre.trim(), comision_pct: isNaN(comision) ? 0 : comision },
     })
     if (r.error) { toast.error(r.error); return }
     toast.success("Canal actualizado")
@@ -129,7 +137,7 @@ function CanalesTab({ cedisId }: { cedisId: string }) {
             <TableHeader>
               <TableRow className="bg-muted/40">
                 <TableHead>Nombre</TableHead>
-                <TableHead>Descripcion</TableHead>
+                <TableHead>Comisión %</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -144,8 +152,8 @@ function CanalesTab({ cedisId }: { cedisId: string }) {
                 canales.map((canal: CanalVenta) => (
                   <TableRow key={canal.id}>
                     <TableCell className="font-medium">{canal.nombre}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {canal.descripcion ?? "—"}
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {canal.comision_pct > 0 ? `${canal.comision_pct}%` : "—"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -156,6 +164,7 @@ function CanalesTab({ cedisId }: { cedisId: string }) {
                           onClick={() => {
                             setEditCanal(canal)
                             setNewNombre(canal.nombre)
+                            setNewComision(String(canal.comision_pct ?? 0))
                           }}
                           aria-label="Editar"
                         >
@@ -180,18 +189,33 @@ function CanalesTab({ cedisId }: { cedisId: string }) {
         </div>
       )}
 
-      <Dialog open={createOpen} onOpenChange={(o) => !o && setCreateOpen(false)}>
+      <Dialog open={createOpen} onOpenChange={(o) => { if (!o) { setCreateOpen(false); setCreateNombre(""); setCreateComision("") } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Nuevo canal de venta</DialogTitle>
           </DialogHeader>
-          <Input
-            placeholder="Nombre del canal"
-            value={createNombre}
-            onChange={(e) => setCreateNombre(e.target.value)}
-          />
+          <div className="space-y-3">
+            <Input
+              placeholder="Nombre del canal"
+              value={createNombre}
+              onChange={(e) => setCreateNombre(e.target.value)}
+            />
+            <div className="relative">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                placeholder="Comisión % (opcional)"
+                value={createComision}
+                onChange={(e) => setCreateComision(e.target.value)}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setCreateNombre(""); setCreateComision("") }}>
               Cancelar
             </Button>
             <Button onClick={handleCreate} disabled={createCanal.isPending}>
@@ -206,11 +230,26 @@ function CanalesTab({ cedisId }: { cedisId: string }) {
           <DialogHeader>
             <DialogTitle>Editar canal</DialogTitle>
           </DialogHeader>
-          <Input
-            placeholder="Nombre"
-            value={newNombre}
-            onChange={(e) => setNewNombre(e.target.value)}
-          />
+          <div className="space-y-3">
+            <Input
+              placeholder="Nombre"
+              value={newNombre}
+              onChange={(e) => setNewNombre(e.target.value)}
+            />
+            <div className="relative">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                placeholder="Comisión %"
+                value={newComision}
+                onChange={(e) => setNewComision(e.target.value)}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditCanal(null)}>
               Cancelar

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
@@ -73,10 +73,18 @@ export function VentaDeclaradaModal({
     },
   })
 
+  const [openRecetaIdx, setOpenRecetaIdx] = useState<number | null>(null)
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
   })
+
+  function appendReceta() {
+    const nextIdx = fields.length
+    append({ receta_id: "", variacion_id: null, cantidad_vendida: 0 })
+    setOpenRecetaIdx(nextIdx)
+  }
 
   useEffect(() => {
     if (!open) {
@@ -88,6 +96,7 @@ export function VentaDeclaradaModal({
         notas: "",
         items: [{ receta_id: "", variacion_id: null, cantidad_vendida: 0 }],
       })
+      setOpenRecetaIdx(null)
     }
   }, [open, form])
 
@@ -212,24 +221,7 @@ export function VentaDeclaradaModal({
             <Separator />
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Platillos / Recetas</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    append({
-                      receta_id: "",
-                      variacion_id: null,
-                      cantidad_vendida: 0,
-                    })
-                  }
-                >
-                  <PlusCircle className="h-4 w-4 mr-1.5" aria-hidden />
-                  Agregar
-                </Button>
-              </div>
+              <p className="text-sm font-medium">Platillos / Recetas</p>
 
               {fields.map((field, index) => {
                 const selectedRecetaId = form.watch(`items.${index}.receta_id`)
@@ -248,7 +240,12 @@ export function VentaDeclaradaModal({
                           {index === 0 && (
                             <FormLabel className="text-xs">Receta</FormLabel>
                           )}
-                          <Select value={f.value} onValueChange={f.onChange}>
+                          <Select
+                            value={f.value}
+                            onValueChange={(v) => { f.onChange(v); setOpenRecetaIdx(null) }}
+                            open={openRecetaIdx === index}
+                            onOpenChange={(o) => setOpenRecetaIdx(o ? index : null)}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Seleccionar receta..." />
@@ -339,6 +336,15 @@ export function VentaDeclaradaModal({
                   </div>
                 )
               })}
+
+              <button
+                type="button"
+                onClick={appendReceta}
+                className="flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+              >
+                <PlusCircle className="h-4 w-4" aria-hidden />
+                Agregar platillo
+              </button>
             </div>
 
             <DialogFooter>

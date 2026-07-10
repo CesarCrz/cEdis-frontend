@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useParams } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal, PlusCircle, Truck, PowerOff } from "lucide-react"
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
+import { KbdShortcut } from "@/components/common/kbd-shortcut"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/common/page-header"
@@ -28,6 +30,7 @@ export default function ProveedoresPage() {
   const cedisId = params.cedisId as string
 
   const [modalOpen, setModalOpen] = useState(false)
+  useKeyboardShortcut("n", useCallback(() => { setEditingProveedor(undefined); setModalOpen(true) }, []), { enabled: !modalOpen })
   const [editingProveedor, setEditingProveedor] = useState<
     Proveedor | undefined
   >()
@@ -52,7 +55,7 @@ export default function ProveedoresPage() {
       data: { activo: false },
     })
     if (res.error) {
-      toast.error("Error al desactivar proveedor")
+      toast.error(res.error)
       return
     }
     toast.success(`${confirmDeactivate.nombre} desactivado`)
@@ -145,7 +148,7 @@ export default function ProveedoresPage() {
             }}
           >
             <PlusCircle className="h-4 w-4 mr-2" aria-hidden />
-            Nuevo proveedor
+            Nuevo proveedor<KbdShortcut keys="n" />
           </Button>
         }
       />

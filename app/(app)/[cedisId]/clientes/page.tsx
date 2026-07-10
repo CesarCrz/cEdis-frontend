@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useParams } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal, PlusCircle, Users, PowerOff } from "lucide-react"
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
+import { KbdShortcut } from "@/components/common/kbd-shortcut"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/common/page-header"
@@ -28,6 +30,7 @@ export default function ClientesPage() {
   const cedisId = params.cedisId as string
 
   const [modalOpen, setModalOpen] = useState(false)
+  useKeyboardShortcut("n", useCallback(() => { setEditingCliente(undefined); setModalOpen(true) }, []), { enabled: !modalOpen })
   const [editingCliente, setEditingCliente] = useState<Cliente | undefined>()
   const [confirmDeactivate, setConfirmDeactivate] = useState<Cliente | null>(
     null
@@ -44,7 +47,7 @@ export default function ClientesPage() {
       data: { activo: false },
     })
     if (res.error) {
-      toast.error("Error al desactivar cliente")
+      toast.error(res.error)
       return
     }
     toast.success(`${confirmDeactivate.nombre} desactivado`)
@@ -140,7 +143,7 @@ export default function ClientesPage() {
             }}
           >
             <PlusCircle className="h-4 w-4 mr-2" aria-hidden />
-            Nuevo cliente
+            Nuevo cliente<KbdShortcut keys="n" />
           </Button>
         }
       />

@@ -6,6 +6,7 @@ export interface Cedis {
   descripcion?: string | null
   created_at: string
   updated_at: string
+  my_role?: string
 }
 
 export interface CedisMember {
@@ -37,7 +38,7 @@ export interface UnidadMedida {
   nombre: string
   simbolo: string
   tipo: "peso" | "volumen" | "unidad"
-  factor_base: number
+  factor: number
 }
 
 export interface PrecioHistorial {
@@ -58,16 +59,35 @@ export interface Insumo {
   categoria?: Categoria | null
   unidad_id?: string | null
   unidad_medida: string
+  unidad?: Pick<UnidadMedida, "id" | "nombre" | "simbolo" | "factor"> | null
   stock_actual: number
   stock_minimo: number
   costo_unitario?: number | null
   precio_unitario?: number | null
   proveedor_id?: string | null
   proveedor?: Proveedor | null
+  receta_id?: string | null
   activo: boolean
   created_at: string
   updated_at: string
   historial_precios?: PrecioHistorial[]
+}
+
+export interface RecetaVariacion {
+  id: string
+  receta_id: string
+  nombre: string
+  factor: number
+  precio?: number | null
+  activa: boolean
+  costo_teorico?: number
+}
+
+export interface RecetaCategoria {
+  id: string
+  cedis_id: string
+  nombre: string
+  created_at: string
 }
 
 export interface Receta {
@@ -75,22 +95,29 @@ export interface Receta {
   cedis_id: string
   nombre: string
   descripcion?: string | null
-  unidad_rendimiento: string
-  cantidad_rendimiento: number
-  activo: boolean
+  categoria_id?: string | null
+  categoria?: Pick<RecetaCategoria, "id" | "nombre"> | null
+  rendimiento: number
+  rendimiento_unidad_id?: string | null
+  rendimiento_unidad?: Pick<UnidadMedida, "id" | "simbolo"> | null
+  activa: boolean
   created_at: string
   updated_at: string
+  variaciones?: RecetaVariacion[]
   ingredientes?: RecetaIngrediente[]
+  costo_teorico_base?: number
 }
 
 export interface RecetaIngrediente {
   id: string
   receta_id: string
-  insumo_id: string
+  insumo_id?: string | null
+  sub_receta_id?: string | null
   cantidad: number
-  unidad: string
-  unidad_id?: string | null
-  insumo?: Insumo
+  unidad_id: string
+  insumo?: Pick<Insumo, "id" | "nombre" | "costo_unitario" | "unidad_id"> | null
+  sub_receta?: Pick<Receta, "id" | "nombre" | "rendimiento" | "rendimiento_unidad_id"> | null
+  unidad?: Pick<UnidadMedida, "id" | "nombre" | "simbolo" | "factor"> | null
 }
 
 export interface Cliente {
@@ -259,7 +286,7 @@ export interface CanalVenta {
   id: string
   cedis_id: string
   nombre: string
-  descripcion?: string | null
+  comision_pct: number
   activo: boolean
   created_at: string
 }

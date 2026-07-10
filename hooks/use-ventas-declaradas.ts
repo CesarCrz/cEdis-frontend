@@ -43,7 +43,10 @@ export function useDeleteVentaDeclarada(cedisId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => ventasDeclaradasApi.delete(cedisId, id),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["ventas-declaradas", cedisId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ventas-declaradas", cedisId] })
+      qc.invalidateQueries({ queryKey: ["inventario", cedisId] })
+      qc.invalidateQueries({ queryKey: ["kardex", cedisId] })
+    },
   })
 }

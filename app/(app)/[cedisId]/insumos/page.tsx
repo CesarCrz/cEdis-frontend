@@ -1,11 +1,14 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback } from "react"
 import { useParams } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
+import { KbdShortcut } from "@/components/common/kbd-shortcut"
 import {
   MoreHorizontal,
   Upload,
+  Download,
   PlusCircle,
   Search,
   X,
@@ -46,6 +49,30 @@ import { useProveedores } from "@/hooks/use-proveedores"
 import { formatCurrency, formatQuantity } from "@/lib/utils/format"
 import type { Insumo } from "@/types/app.types"
 
+const PAGE_SIZE = 50
+
+function exportInsumosCsv(insumos: Insumo[]) {
+  const headers = ["nombre", "sku", "categoria", "unidad", "costo_unitario", "stock_actual", "stock_minimo", "proveedor"]
+  const rows = insumos.map((ins) => [
+    ins.nombre,
+    ins.sku ?? "",
+    ins.categoria?.nombre ?? "",
+    ins.unidad?.simbolo ?? ins.unidad_medida ?? "",
+    ins.costo_unitario ?? "",
+    ins.stock_actual,
+    ins.stock_minimo,
+    ins.proveedor?.nombre ?? "",
+  ])
+  const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n")
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `insumos_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const ALERTA_OPTIONS = [
   { value: "todos", label: "Todos" },
   { value: "ok", label: "En stock" },
@@ -59,12 +86,13 @@ export default function InsumosPage() {
   const cedisId = params.cedisId as string
 
   const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [categoriaFilter, setCategoriaFilter] = useState("")
   const [proveedorFilter, setProveedorFilter] = useState("")
   const [alertaFilter, setAlertaFilter] = useState("")
+  const [pageIndex, setPageIndex] = useState(0)
 
   const [modalOpen, setModalOpen] = useState(false)
+  useKeyboardShortcut("n", useCallback(() => { setEditingInsumo(undefined); setModalOpen(true) }, []), { enabled: !modalOpen })
   const [editingInsumo, setEditingInsumo] = useState<Insumo | undefined>()
   const [csvSheetOpen, setCsvSheetOpen] = useState(false)
   const [historySheetOpen, setHistorySheetOpen] = useState(false)
@@ -76,50 +104,56 @@ export default function InsumosPage() {
     null
   )
 
-  // Debounce search
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    debounceTimer.current = setTimeout(() => {
-      setDebouncedSearch(search)
-    }, 300)
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    }
-  }, [search])
-
-  const filters = {
-    ...(debouncedSearch ? { search: debouncedSearch } : {}),
-    ...(categoriaFilter && categoriaFilter !== "__todos__"
-      ? { categoria: categoriaFilter }
-      : {}),
-    ...(proveedorFilter && proveedorFilter !== "__todos__"
-      ? { proveedor: proveedorFilter }
-      : {}),
-    ...(alertaFilter && alertaFilter !== "todos"
-      ? { alerta: alertaFilter }
-      : {}),
-  }
-
-  const { data: res, isLoading } = useInsumos(cedisId, filters)
+  // Fetch all at once — filter client-side for instant search
+  const { data: res, isLoading } = useInsumos(cedisId, { pageSize: 1000 })
   const { data: categoriasRes } = useCategorias(cedisId)
   const { data: proveedoresRes } = useProveedores(cedisId)
   const updateInsumo = useUpdateInsumo(cedisId)
 
-  const insumos = res?.data ?? []
+  const allInsumos = res?.data ?? []
   const categorias = categoriasRes?.data ?? []
   const proveedores = proveedoresRes?.data ?? []
 
-  const hasFilters =
-    !!debouncedSearch || !!categoriaFilter || !!proveedorFilter || !!alertaFilter
+  const insumos = allInsumos.filter((ins) => {
+    if (search) {
+      const q = search.toLowerCase()
+      if (
+        !ins.nombre.toLowerCase().includes(q) &&
+        !(ins.sku ?? "").toLowerCase().includes(q)
+      )
+        return false
+    }
+    if (categoriaFilter && categoriaFilter !== "__todos__") {
+      if (ins.categoria_id !== categoriaFilter) return false
+    }
+    if (proveedorFilter && proveedorFilter !== "__todos__") {
+      if (ins.proveedor_id !== proveedorFilter) return false
+    }
+    if (alertaFilter && alertaFilter !== "todos") {
+      const stock = Number(ins.stock_actual)
+      const min = Number(ins.stock_minimo)
+      switch (alertaFilter) {
+        case "ok":       if (!(stock > min)) return false; break
+        case "warn":     if (!(stock <= min && stock > min * 0.5 && stock > 0)) return false; break
+        case "low":      if (!(stock <= min * 0.5 && stock > 0)) return false; break
+        case "critical": if (!(stock === 0)) return false; break
+      }
+    }
+    return true
+  })
+
+  const hasFilters = !!search || !!categoriaFilter || !!proveedorFilter || !!alertaFilter
 
   function clearFilters() {
     setSearch("")
-    setDebouncedSearch("")
     setCategoriaFilter("")
     setProveedorFilter("")
     setAlertaFilter("")
+    setPageIndex(0)
   }
+
+  const pageCount = Math.ceil(insumos.length / PAGE_SIZE)
+  const paginatedInsumos = insumos.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE)
 
   const handleEdit = useCallback((insumo: Insumo) => {
     setEditingInsumo(insumo)
@@ -133,7 +167,7 @@ export default function InsumosPage() {
       data: { activo: false },
     })
     if (res.error) {
-      toast.error("Error al desactivar insumo")
+      toast.error(res.error)
       return
     }
     toast.success(`${confirmDeactivate.nombre} desactivado`)
@@ -142,22 +176,15 @@ export default function InsumosPage() {
 
   const columns: ColumnDef<Insumo>[] = [
     {
-      accessorKey: "sku",
-      header: "SKU",
-      cell: ({ row }) =>
-        row.original.sku ? (
-          <span className="font-mono text-xs text-muted-foreground">
-            {row.original.sku}
-          </span>
-        ) : (
-          <span className="text-muted-foreground/50 text-xs">—</span>
-        ),
-    },
-    {
       accessorKey: "nombre",
       header: "Nombre",
       cell: ({ row }) => (
-        <span className="font-medium">{row.original.nombre}</span>
+        <div>
+          <span className="font-medium">{row.original.nombre}</span>
+          {row.original.sku && (
+            <p className="font-mono text-xs text-muted-foreground/60 mt-0.5">{row.original.sku}</p>
+          )}
+        </div>
       ),
     },
     {
@@ -177,7 +204,7 @@ export default function InsumosPage() {
       header: "Unidad",
       cell: ({ row }) => (
         <span className="font-mono text-xs">
-          {row.original.unidad_id ?? row.original.unidad_medida}
+          {row.original.unidad?.simbolo ?? row.original.unidad_medida ?? "—"}
         </span>
       ),
     },
@@ -196,27 +223,16 @@ export default function InsumosPage() {
     },
     {
       id: "stock",
-      header: "Stock actual",
-      cell: ({ row }) => (
-        <span className="font-mono text-sm">
-          {formatQuantity(
-            row.original.stock_actual,
-            row.original.unidad_id ?? row.original.unidad_medida
-          )}
-        </span>
-      ),
-    },
-    {
-      id: "stock_min",
-      header: "Stock min",
-      cell: ({ row }) => (
-        <span className="font-mono text-sm text-muted-foreground">
-          {formatQuantity(
-            row.original.stock_minimo,
-            row.original.unidad_id ?? row.original.unidad_medida
-          )}
-        </span>
-      ),
+      header: "Stock",
+      cell: ({ row }) => {
+        const simbolo = row.original.unidad?.simbolo ?? row.original.unidad_medida
+        return (
+          <div>
+            <span className="font-mono text-sm">{formatQuantity(row.original.stock_actual, simbolo)}</span>
+            <p className="font-mono text-xs text-muted-foreground/60 mt-0.5">mín {formatQuantity(row.original.stock_minimo, simbolo)}</p>
+          </div>
+        )
+      },
     },
     {
       id: "alerta",
@@ -225,7 +241,7 @@ export default function InsumosPage() {
         <StockBadge
           stock={row.original.stock_actual}
           minimum={row.original.stock_minimo}
-          unit={row.original.unidad_id ?? row.original.unidad_medida}
+          unit={row.original.unidad?.simbolo ?? row.original.unidad_medida}
           showQuantity={false}
         />
       ),
@@ -296,6 +312,14 @@ export default function InsumosPage() {
           <>
             <Button
               variant="outline"
+              onClick={() => exportInsumosCsv(insumos)}
+              disabled={insumos.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" aria-hidden />
+              Exportar CSV
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => setCsvSheetOpen(true)}
             >
               <Upload className="h-4 w-4 mr-2" aria-hidden />
@@ -308,7 +332,7 @@ export default function InsumosPage() {
               }}
             >
               <PlusCircle className="h-4 w-4 mr-2" aria-hidden />
-              Nuevo insumo
+              Nuevo insumo<KbdShortcut keys="n" />
             </Button>
           </>
         }
@@ -325,7 +349,7 @@ export default function InsumosPage() {
             id="insumos-search"
             placeholder="Buscar por nombre o SKU..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPageIndex(0) }}
             className="pl-8"
             aria-label="Buscar insumos"
           />
@@ -333,9 +357,7 @@ export default function InsumosPage() {
 
         <Select
           value={categoriaFilter || "__todos__"}
-          onValueChange={(v) =>
-            setCategoriaFilter(v === "__todos__" ? "" : v)
-          }
+          onValueChange={(v) => { setCategoriaFilter(v === "__todos__" ? "" : v); setPageIndex(0) }}
         >
           <SelectTrigger className="w-[160px]" aria-label="Filtrar por categoria">
             <SelectValue placeholder="Categoria" />
@@ -352,9 +374,7 @@ export default function InsumosPage() {
 
         <Select
           value={proveedorFilter || "__todos__"}
-          onValueChange={(v) =>
-            setProveedorFilter(v === "__todos__" ? "" : v)
-          }
+          onValueChange={(v) => { setProveedorFilter(v === "__todos__" ? "" : v); setPageIndex(0) }}
         >
           <SelectTrigger className="w-[160px]" aria-label="Filtrar por proveedor">
             <SelectValue placeholder="Proveedor" />
@@ -371,7 +391,7 @@ export default function InsumosPage() {
 
         <Select
           value={alertaFilter || "todos"}
-          onValueChange={(v) => setAlertaFilter(v === "todos" ? "" : v)}
+          onValueChange={(v) => { setAlertaFilter(v === "todos" ? "" : v); setPageIndex(0) }}
         >
           <SelectTrigger className="w-[140px]" aria-label="Filtrar por nivel de alerta">
             <SelectValue placeholder="Alerta" />
@@ -415,8 +435,11 @@ export default function InsumosPage() {
       ) : (
         <DataTable
           columns={columns}
-          data={insumos}
+          data={paginatedInsumos}
           isLoading={isLoading}
+          pagination={pageCount > 1 ? { pageIndex, pageSize: PAGE_SIZE } : undefined}
+          pageCount={pageCount}
+          onPaginationChange={pageCount > 1 ? (p) => setPageIndex(p.pageIndex) : undefined}
         />
       )}
 

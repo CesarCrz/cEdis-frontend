@@ -8,11 +8,14 @@ import {
   type BatchTicketData,
 } from "@/lib/api/ventas"
 
+const STALE_5MIN = 5 * 60 * 1000
+
 export function useVentas(cedisId: string, params?: VentasParams) {
   return useQuery({
     queryKey: ["ventas", cedisId, params],
     queryFn: () => ventasApi.list(cedisId, params),
     enabled: !!cedisId,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -21,6 +24,7 @@ export function useVenta(cedisId: string, id: string) {
     queryKey: ["venta", cedisId, id],
     queryFn: () => ventasApi.get(cedisId, id),
     enabled: !!cedisId && !!id,
+    staleTime: STALE_5MIN,
   })
 }
 

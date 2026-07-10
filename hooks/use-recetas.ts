@@ -4,11 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import * as api from "@/lib/api/recetas"
 import type { RecetasParams } from "@/lib/api/recetas"
 
+const STALE_5MIN = 5 * 60 * 1000
+
 export function useRecetas(cedisId: string, params?: RecetasParams) {
   return useQuery({
     queryKey: ["recetas", cedisId, params],
     queryFn: () => api.getRecetas(cedisId, params),
     enabled: !!cedisId,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -17,6 +20,7 @@ export function useReceta(cedisId: string, id: string) {
     queryKey: ["receta", cedisId, id],
     queryFn: () => api.getReceta(cedisId, id),
     enabled: !!id && !!cedisId,
+    staleTime: STALE_5MIN,
   })
 }
 

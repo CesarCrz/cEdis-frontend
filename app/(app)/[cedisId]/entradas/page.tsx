@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
 import { PlusCircle, X } from "lucide-react"
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
+import { KbdShortcut } from "@/components/common/kbd-shortcut"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/common/page-header"
@@ -41,6 +43,7 @@ export default function EntradasPage() {
   const [desde, setDesde] = useState("")
   const [hasta, setHasta] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
+  useKeyboardShortcut("n", useCallback(() => setModalOpen(true), []), { enabled: !modalOpen })
 
   const filters = {
     ...(statusFilter && statusFilter !== "todos" ? { status: statusFilter } : {}),
@@ -151,7 +154,7 @@ export default function EntradasPage() {
         actions={
           <Button onClick={() => setModalOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-2" aria-hidden />
-            Nueva entrada
+            Nueva entrada<KbdShortcut keys="n" />
           </Button>
         }
       />

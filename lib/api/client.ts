@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/client"
+
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001"
 
@@ -18,16 +20,29 @@ export async function apiClient<T>(
     })
   }
 
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  const authHeader: Record<string, string> = session?.access_token
+    ? { Authorization: `Bearer ${session.access_token}` }
+    : {}
+
   try {
     const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(15000),
       headers: {
         "Content-Type": "application/json",
+        ...authHeader,
         ...fetchOptions.headers,
       },
       ...fetchOptions,
     })
 
     const json = await res.json()
+
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.location.href = "/auth/login"
+      return { data: null, error: "Sesión expirada" }
+    }
 
     if (!res.ok) {
       return {

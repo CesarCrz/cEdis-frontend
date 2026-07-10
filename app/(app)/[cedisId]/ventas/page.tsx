@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
 import { PlusCircle, Users, X } from "lucide-react"
+import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
+import { KbdShortcut } from "@/components/common/kbd-shortcut"
 
 import { PageHeader } from "@/components/common/page-header"
 import { DataTable } from "@/components/common/data-table"
@@ -43,6 +45,7 @@ export default function VentasPage() {
   const [hasta, setHasta] = useState("")
   const [ticketModalOpen, setTicketModalOpen] = useState(false)
   const [batchModalOpen, setBatchModalOpen] = useState(false)
+  useKeyboardShortcut("n", useCallback(() => setTicketModalOpen(true), []), { enabled: !ticketModalOpen && !batchModalOpen })
 
   const filters = {
     ...(statusFilter && statusFilter !== "todos" ? { status: statusFilter } : {}),
@@ -150,7 +153,7 @@ export default function VentasPage() {
             </Button>
             <Button onClick={() => setTicketModalOpen(true)}>
               <PlusCircle className="h-4 w-4 mr-2" aria-hidden />
-              Nuevo ticket
+              Nuevo ticket<KbdShortcut keys="n" />
             </Button>
           </>
         }
