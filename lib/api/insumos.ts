@@ -44,7 +44,7 @@ export async function importInsumosCsv(cedisId: string, file: File) {
   const formData = new FormData()
   formData.append("file", file)
   return apiClient<{ imported: number; errors: string[] }>(
-    `/api/${cedisId}/insumos/import`,
+    `/api/${cedisId}/insumos/import-csv`,
     {
       method: "POST",
       body: formData,

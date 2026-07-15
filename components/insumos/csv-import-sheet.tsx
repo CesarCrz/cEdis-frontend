@@ -3,7 +3,8 @@
 import { useRef, useState } from "react"
 import Papa from "papaparse"
 import { toast } from "sonner"
-import { Upload, Download, CheckCircle2, XCircle } from "lucide-react"
+import { Upload, Download, CheckCircle2, XCircle, AlertTriangle } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 import {
   Sheet,
@@ -21,7 +22,9 @@ interface CsvImportSheetProps {
   cedisId: string
 }
 
-const CSV_HEADERS = ["nombre", "sku", "unidad", "costo_unitario", "stock_minimo", "stock_inicial", "categoria", "proveedor"]
+const REQUIRED_COLS = ["nombre", "unidad", "costo_unitario"]
+const OPTIONAL_COLS = ["sku", "stock_minimo", "stock_inicial", "categoria", "proveedor"]
+const ALL_COLS = [...REQUIRED_COLS, ...OPTIONAL_COLS]
 
 const COLUMN_DOCS = [
   { col: "nombre", req: true, desc: "Nombre del insumo", ejemplo: "Harina de trigo" },
@@ -36,7 +39,7 @@ const COLUMN_DOCS = [
 
 function downloadTemplate() {
   const rows = [
-    CSV_HEADERS.join(","),
+    ALL_COLS.join(","),
     '"Harina de trigo","HARI-001","kg","25.50","10","50","Harinas","Distribuidora XYZ"',
     '"Azucar","AZUC-001","kg","18.00","5","25","Abarrotes",""',
     '"Aceite vegetal","","L","32.00","2","10","Aceites",""',
@@ -52,29 +55,50 @@ function downloadTemplate() {
 
 interface ImportError { row: number; message: string }
 
+interface ColStatus {
+  found: string[]    // required cols present
+  missing: string[]  // required cols absent
+  extra: string[]    // unknown cols (not in template)
+}
+
+function checkColumns(headers: string[]): ColStatus {
+  const lc = headers.map((h) => h.toLowerCase().trim())
+  const found = REQUIRED_COLS.filter((c) => lc.includes(c))
+  const missing = REQUIRED_COLS.filter((c) => !lc.includes(c))
+  const known = new Set([...REQUIRED_COLS, ...OPTIONAL_COLS])
+  const extra = lc.filter((h) => !known.has(h))
+  return { found, missing, extra }
+}
+
 export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<Record<string, string>[]>([])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [colStatus, setColStatus] = useState<ColStatus | null>(null)
   const [importResult, setImportResult] = useState<{
     imported: number
     errors: ImportError[]
   } | null>(null)
   const importMutation = useImportInsumosCsv(cedisId)
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  function processFile(file: File) {
     setSelectedFile(file)
     setImportResult(null)
-
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
         setPreview(results.data.slice(0, 5))
+        const headers = results.meta.fields ?? []
+        setColStatus(checkColumns(headers))
       },
     })
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    processFile(file)
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -84,20 +108,15 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
       toast.error("Solo se aceptan archivos .csv")
       return
     }
-    setSelectedFile(file)
-    setImportResult(null)
-
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        setPreview(results.data.slice(0, 5))
-      },
-    })
+    processFile(file)
   }
 
   async function handleImport() {
     if (!selectedFile) return
+    if (colStatus && colStatus.missing.length > 0) {
+      toast.error(`Faltan columnas requeridas: ${colStatus.missing.join(", ")}`)
+      return
+    }
     const res = await importMutation.mutateAsync(selectedFile)
     if (res.error) {
       toast.error("Error al importar: " + res.error)
@@ -105,18 +124,22 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
     }
     if (res.data) {
       setImportResult(res.data as unknown as { imported: number; errors: ImportError[] })
-      toast.success(`${res.data.imported} insumos importados exitosamente`)
+      if ((res.data.imported ?? 0) > 0) {
+        toast.success(`${res.data.imported} insumos importados`)
+      }
     }
   }
 
   function handleReset() {
     setSelectedFile(null)
     setPreview([])
+    setColStatus(null)
     setImportResult(null)
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const previewHeaders = preview.length > 0 ? Object.keys(preview[0]) : []
+  const canImport = !!selectedFile && !!colStatus && colStatus.missing.length === 0
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -166,7 +189,7 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
                 </tbody>
               </table>
             </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">Límite: 1,000 filas · 5 MB · solo .csv</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">Límite: 1,000 filas · 5 MB · solo .csv · el orden de columnas no importa</p>
           </section>
 
           {/* Paso 2: Upload */}
@@ -208,6 +231,33 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
             )}
           </section>
 
+          {/* Column validation badge */}
+          {colStatus && !importResult && (
+            <section>
+              <h3 className="text-sm font-semibold mb-2">Validación de columnas</h3>
+              <div className="space-y-1.5">
+                {REQUIRED_COLS.map((col) => {
+                  const ok = colStatus.found.includes(col)
+                  return (
+                    <div key={col} className={cn("flex items-center gap-2 text-xs rounded-md px-2 py-1.5", ok ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400" : "bg-destructive/10 text-destructive")}>
+                      {ok
+                        ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        : <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                      <span className="font-mono font-semibold">{col}</span>
+                      <span className="text-current/70">{ok ? "— encontrada" : "— FALTANTE (requerida)"}</span>
+                    </div>
+                  )
+                })}
+                {colStatus.extra.length > 0 && (
+                  <div className="flex items-start gap-2 text-xs rounded-md px-2 py-1.5 bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden />
+                    <span>Columnas desconocidas (se ignorarán): <span className="font-mono">{colStatus.extra.join(", ")}</span></span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* Preview */}
           {preview.length > 0 && !importResult && (
             <section>
@@ -225,9 +275,17 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
                         <th
                           key={h}
                           scope="col"
-                          className="px-2 py-1.5 text-left font-semibold text-muted-foreground"
+                          className={cn(
+                            "px-2 py-1.5 text-left font-semibold",
+                            REQUIRED_COLS.includes(h.toLowerCase().trim())
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                          )}
                         >
                           {h}
+                          {REQUIRED_COLS.includes(h.toLowerCase().trim()) && (
+                            <span className="text-destructive ml-0.5">✱</span>
+                          )}
                         </th>
                       ))}
                     </tr>
@@ -235,22 +293,44 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
                   <tbody>
                     {preview.map((row, i) => (
                       <tr key={i} className="border-t border-border">
-                        {previewHeaders.map((h) => (
-                          <td key={h} className="px-2 py-1.5 font-mono">
-                            {row[h] ?? ""}
-                          </td>
-                        ))}
+                        {previewHeaders.map((h) => {
+                          const isRequired = REQUIRED_COLS.includes(h.toLowerCase().trim())
+                          const isEmpty = !row[h]
+                          return (
+                            <td
+                              key={h}
+                              className={cn(
+                                "px-2 py-1.5 font-mono",
+                                isRequired && isEmpty
+                                  ? "bg-destructive/10 text-destructive"
+                                  : ""
+                              )}
+                            >
+                              {row[h] ? row[h] : (
+                                isRequired
+                                  ? <span className="text-destructive font-semibold">vacío</span>
+                                  : <span className="text-muted-foreground/40">—</span>
+                              )}
+                            </td>
+                          )
+                        })}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {colStatus && colStatus.missing.length === 0 && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Celdas en rojo = campo requerido vacío en esa fila. Esas filas se omitirán al importar.
+                </p>
+              )}
 
               <div className="mt-4 flex gap-2">
                 <Button
                   type="button"
                   onClick={handleImport}
-                  disabled={importMutation.isPending}
+                  disabled={importMutation.isPending || !canImport}
+                  title={!canImport && colStatus?.missing.length ? `Faltan columnas: ${colStatus.missing.join(", ")}` : undefined}
                 >
                   {importMutation.isPending
                     ? "Importando..."
@@ -281,15 +361,19 @@ export function CsvImportSheet({ open, onClose, cedisId }: CsvImportSheetProps) 
                 <div className="mt-3 space-y-1">
                   <p className="text-xs font-semibold text-destructive flex items-center gap-1">
                     <XCircle className="h-3.5 w-3.5" aria-hidden />
-                    {importResult.errors.length} errores
+                    {importResult.errors.length} filas omitidas
                   </p>
-                  <ul className="text-xs text-muted-foreground space-y-0.5 max-h-40 overflow-y-auto">
+                  <ul className="text-xs text-muted-foreground space-y-0.5 max-h-48 overflow-y-auto rounded-md border border-border p-2">
                     {importResult.errors.map((e, i) => (
                       <li key={i} className="font-mono">
-                        Fila {e.row}: {e.message}
+                        <span className="text-foreground font-semibold">Fila {e.row}:</span>{" "}
+                        {e.message}
                       </li>
                     ))}
                   </ul>
+                  <p className="text-xs text-muted-foreground">
+                    Corrige las filas marcadas y vuelve a importar solo esas.
+                  </p>
                 </div>
               )}
               <Button
