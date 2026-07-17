@@ -4,6 +4,8 @@ import { useState } from "react"
 import { useParams } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Download, Search, SlidersHorizontal } from "lucide-react"
+import { PrintButton } from "@/components/common/print-button"
+import { formatDateTime } from "@/lib/utils/format"
 
 import { PageHeader } from "@/components/common/page-header"
 import { DataTable } from "@/components/common/data-table"
@@ -229,11 +231,13 @@ export default function InventarioPage() {
 
   return (
     <div className="p-6">
+      <div className="print:hidden">
       <PageHeader
         title="Inventario"
         description="Stock actual por insumo"
         actions={
           <>
+            <PrintButton />
             <Button
               variant="outline"
               onClick={() => exportCsv(inventario)}
@@ -377,6 +381,78 @@ export default function InventarioPage() {
           Selecciona una sucursal para ver su inventario
         </div>
       )}
+      </div>
+
+      {/* Print-only layout — hidden on screen, rendered when printing */}
+      <div className="hidden print:block">
+        <div className="mb-4 border-b pb-3">
+          <h1 className="text-xl font-bold">cEdis — Inventario</h1>
+          {view === "sucursales" && clienteId && (
+            <p className="text-sm">
+              Sucursal: <strong>{clientes.find(c => c.id === clienteId)?.nombre ?? clienteId}</strong>
+            </p>
+          )}
+          {view === "cedis" && categoriaFilter && (
+            <p className="text-sm">Categoría: <strong>{categoriaFilter}</strong></p>
+          )}
+          {view === "sucursales" && sucursalCatFilter && (
+            <p className="text-sm">Categoría: <strong>{sucursalCatFilter}</strong></p>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            Generado el {formatDateTime(new Date().toISOString())} · {view === "cedis" ? filteredCedis.length : filteredSucursal.length} registros
+          </p>
+        </div>
+
+        {view === "cedis" ? (
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-1 pr-2">Insumo</th>
+                <th className="text-left py-1 pr-2 print-mini-hide">SKU</th>
+                <th className="text-left py-1 pr-2 print-mini-hide">Categoría</th>
+                <th className="text-right py-1 pr-2">Stock</th>
+                <th className="text-right py-1 pr-2 print-mini-hide">Mín.</th>
+                <th className="text-right py-1">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCedis.map((item) => (
+                <tr key={item.insumo_id} className="border-b border-dashed">
+                  <td className="py-1 pr-2 font-medium">{item.nombre}</td>
+                  <td className="py-1 pr-2 font-mono print-mini-hide">{item.sku ?? "—"}</td>
+                  <td className="py-1 pr-2 print-mini-hide">{item.categoria_nombre ?? "—"}</td>
+                  <td className="py-1 pr-2 text-right font-mono">{item.stock_actual} {item.unidad_simbolo}</td>
+                  <td className="py-1 pr-2 text-right font-mono print-mini-hide">{item.stock_minimo} {item.unidad_simbolo}</td>
+                  <td className="py-1 text-right">{item.semaforo}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : clienteId ? (
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-1 pr-2">Insumo</th>
+                <th className="text-left py-1 pr-2 print-mini-hide">SKU</th>
+                <th className="text-right py-1 pr-2">Entregado</th>
+                <th className="text-right py-1 pr-2 print-mini-hide">Consumido</th>
+                <th className="text-right py-1">En sucursal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSucursal.map((item) => (
+                <tr key={item.insumo_id} className="border-b border-dashed">
+                  <td className="py-1 pr-2 font-medium">{item.nombre}</td>
+                  <td className="py-1 pr-2 font-mono print-mini-hide">{item.sku ?? "—"}</td>
+                  <td className="py-1 pr-2 text-right font-mono">{item.entregado} {item.unidad?.simbolo ?? ""}</td>
+                  <td className="py-1 pr-2 text-right font-mono print-mini-hide">{item.consumido} {item.unidad?.simbolo ?? ""}</td>
+                  <td className="py-1 text-right font-mono font-semibold">{item.stock_calculado} {item.unidad?.simbolo ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+      </div>
 
       <AjusteModal
         open={ajusteOpen}

@@ -4,16 +4,18 @@ import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import {
   ArrowLeft,
-  Printer,
   CheckCircle,
   Truck,
   XCircle,
+  Pencil,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { StatusBadge } from "@/components/common/status-badge"
 import { FolioCell } from "@/components/common/folio-cell"
 import { ConfirmDialog } from "@/components/common/confirm-dialog"
+import { PrintButton } from "@/components/common/print-button"
+import { TicketEditModal } from "@/components/ventas/ticket-edit-modal"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -41,6 +43,7 @@ export default function VentaDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [entregarOpen, setEntregarOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   const { data: res, isLoading } = useVenta(cedisId, id)
   const { data: insumosRes } = useInsumos(cedisId, { pageSize: 1000 })
@@ -111,6 +114,7 @@ export default function VentaDetailPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-4xl print:p-4">
+      {/* Print header (hidden on screen) */}
       <div className="hidden print:block mb-6">
         <div className="flex justify-between items-start">
           <div>
@@ -122,7 +126,7 @@ export default function VentaDetailPage() {
             <p>{formatDate(ticket.created_at)}</p>
           </div>
         </div>
-        <div className="mt-4 border-t pt-4 grid grid-cols-2 gap-4 text-sm">
+        <div className="mt-4 border-t pt-4 grid grid-cols-2 gap-4 text-sm print-mini-stack">
           <div>
             <p className="font-medium">Cliente</p>
             <p>{ticket.cliente?.nombre ?? ticket.cliente_id}</p>
@@ -182,13 +186,18 @@ export default function VentaDetailPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 print:hidden">
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <Printer className="h-4 w-4 mr-1.5" aria-hidden />
-            Imprimir
-          </Button>
+        <div className="flex items-center gap-2 print:hidden flex-wrap justify-end">
+          <PrintButton />
           {isDraft && (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil className="h-4 w-4 mr-1.5" aria-hidden />
+                Editar
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -218,10 +227,10 @@ export default function VentaDetailPage() {
           <TableHeader>
             <TableRow className="bg-muted/40">
               <TableHead>Insumo</TableHead>
-              <TableHead>SKU</TableHead>
+              <TableHead className="print-mini-hide">SKU</TableHead>
               <TableHead className="text-right">Cantidad</TableHead>
               <TableHead>Unidad</TableHead>
-              <TableHead className="text-right">Precio unit.</TableHead>
+              <TableHead className="text-right print-mini-hide">Precio unit.</TableHead>
               <TableHead className="text-right">Subtotal</TableHead>
             </TableRow>
           </TableHeader>
@@ -256,20 +265,16 @@ export default function VentaDetailPage() {
               return (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{nombre}</TableCell>
-                  <TableCell>
+                  <TableCell className="print-mini-hide">
                     {sku ? (
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {sku}
-                      </span>
+                      <span className="font-mono text-xs text-muted-foreground">{sku}</span>
                     ) : (
                       <span className="text-muted-foreground/50 text-xs">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {item.cantidad}
-                  </TableCell>
+                  <TableCell className="text-right font-mono">{item.cantidad}</TableCell>
                   <TableCell className="font-mono text-xs">{unidadSimbolo}</TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono print-mini-hide">
                     <span>{formatCurrency(precioBase)}</span>
                     {!sameUnit && (
                       <span className="text-muted-foreground text-xs ml-1">/{baseSimb}</span>
@@ -295,6 +300,15 @@ export default function VentaDetailPage() {
       <div className="hidden print:block mt-8 pt-4 border-t text-xs text-muted-foreground text-center">
         cEdis — Generado el {formatDateTime(new Date().toISOString())}
       </div>
+
+      {ticket && isDraft && (
+        <TicketEditModal
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          cedisId={cedisId}
+          ticket={ticket}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmOpen}

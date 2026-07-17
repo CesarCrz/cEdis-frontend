@@ -71,6 +71,18 @@ export function useCancelVenta(cedisId: string) {
   })
 }
 
+export function useUpdateVenta(cedisId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateTicketData> }) =>
+      ventasApi.update(cedisId, id, data),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ["ventas", cedisId] })
+      qc.invalidateQueries({ queryKey: ["venta", cedisId, id] })
+    },
+  })
+}
+
 export function useBatchVenta(cedisId: string) {
   const qc = useQueryClient()
   return useMutation({

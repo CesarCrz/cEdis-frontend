@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
-import { ArrowLeft, Printer, CheckCircle, XCircle } from "lucide-react"
+import { ArrowLeft, CheckCircle, XCircle } from "lucide-react"
 import { toast } from "sonner"
 
 import { StatusBadge } from "@/components/common/status-badge"
@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PrintButton } from "@/components/common/print-button"
 import { useEntrada, useConfirmarEntrada, useCancelEntrada } from "@/hooks/use-entradas"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format"
 
@@ -147,14 +148,7 @@ export default function EntradaDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 print:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-          >
-            <Printer className="h-4 w-4 mr-1.5" aria-hidden />
-            Imprimir
-          </Button>
+          <PrintButton />
           {isDraft && (
             <>
               <Button
@@ -180,10 +174,10 @@ export default function EntradaDetailPage() {
           <TableHeader>
             <TableRow className="bg-muted/40">
               <TableHead>Insumo</TableHead>
-              <TableHead>SKU</TableHead>
+              <TableHead className="print-mini-hide">SKU</TableHead>
               <TableHead className="text-right">Cantidad</TableHead>
               <TableHead>Unidad</TableHead>
-              <TableHead className="text-right">Costo unit.</TableHead>
+              <TableHead className="text-right print-mini-hide">Costo unit.</TableHead>
               <TableHead className="text-right">Subtotal</TableHead>
             </TableRow>
           </TableHeader>
@@ -210,7 +204,7 @@ export default function EntradaDetailPage() {
               return (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{nombre}</TableCell>
-                  <TableCell>
+                  <TableCell className="print-mini-hide">
                     {sku ? (
                       <span className="font-mono text-xs text-muted-foreground">
                         {sku}
@@ -223,7 +217,7 @@ export default function EntradaDetailPage() {
                     {item.cantidad}
                   </TableCell>
                   <TableCell className="font-mono text-xs">{unidad}</TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono print-mini-hide">
                     {formatCurrency(item.costo_unitario)}
                   </TableCell>
                   <TableCell className="text-right font-mono font-medium">
