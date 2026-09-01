@@ -28,7 +28,7 @@ const ALL_COLS = [...REQUIRED_COLS, ...OPTIONAL_COLS]
 
 const COLUMN_DOCS = [
   { col: "nombre", req: true, desc: "Nombre del insumo", ejemplo: "Harina de trigo" },
-  { col: "unidad", req: true, desc: "Símbolo o nombre: g, kg, mL, L, pza", ejemplo: "kg" },
+  { col: "unidad", req: true, desc: "g, kg, mg, mL, L, pza (acepta pz, pieza, gr, lt...)", ejemplo: "kg" },
   { col: "costo_unitario", req: true, desc: "Número positivo (precio por unidad)", ejemplo: "25.50" },
   { col: "sku", req: false, desc: "Código único. Se genera automáticamente si se omite", ejemplo: "HARI-001" },
   { col: "stock_minimo", req: false, desc: "Cantidad mínima de alerta (default 0)", ejemplo: "10" },
@@ -40,9 +40,12 @@ const COLUMN_DOCS = [
 function downloadTemplate() {
   const rows = [
     ALL_COLS.join(","),
-    '"Harina de trigo","HARI-001","kg","25.50","10","50","Harinas","Distribuidora XYZ"',
-    '"Azucar","AZUC-001","kg","18.00","5","25","Abarrotes",""',
-    '"Aceite vegetal","","L","32.00","2","10","Aceites",""',
+    // Column order must match ALL_COLS: nombre, unidad, costo_unitario, sku,
+    // stock_minimo, stock_inicial, categoria, proveedor
+    '"Harina de trigo","kg","25.50","HARI-001","10","50","Harinas","Distribuidora XYZ"',
+    '"Azucar","kg","18.00","AZUC-001","5","25","Abarrotes",""',
+    '"Aceite vegetal","L","32.00","","2","10","Aceites",""',
+    '"Vaso 500 ml","pza","1.08","VASO-001","0","0","Plastico",""',
   ]
   const blob = new Blob(["﻿" + rows.join("\n")], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)

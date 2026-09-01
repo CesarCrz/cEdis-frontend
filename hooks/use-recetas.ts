@@ -6,10 +6,13 @@ import type { RecetasParams } from "@/lib/api/recetas"
 
 const STALE_5MIN = 5 * 60 * 1000
 
+const CATALOG_PAGE_SIZE = 1000
+
 export function useRecetas(cedisId: string, params?: RecetasParams) {
+  const query = { pageSize: CATALOG_PAGE_SIZE, ...params }
   return useQuery({
-    queryKey: ["recetas", cedisId, params],
-    queryFn: () => api.getRecetas(cedisId, params),
+    queryKey: ["recetas", cedisId, query],
+    queryFn: () => api.getRecetas(cedisId, query),
     enabled: !!cedisId,
     staleTime: STALE_5MIN,
   })

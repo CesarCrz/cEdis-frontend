@@ -20,7 +20,7 @@ const CSP = [
   "form-action 'self'",
 ].join("; ")
 
-// Role cache: userId -> { role, expiresAt }
+// Role cache: `${userId}:${cedisId}` -> { role, expiresAt }
 const roleCache = new Map<string, { role: string; expiresAt: number }>()
 const ROLE_CACHE_TTL_MS = 30_000
 
@@ -105,7 +105,8 @@ export async function middleware(request: NextRequest) {
     const subPath = cedisRouteMatch[2] ?? "/dashboard"
 
     let role: string | null = null
-    const cached = roleCache.get(user.id)
+    const cacheKey = `${user.id}:${cedisId}`
+    const cached = roleCache.get(cacheKey)
     if (cached && cached.expiresAt > Date.now()) {
       role = cached.role
     } else {
@@ -118,7 +119,7 @@ export async function middleware(request: NextRequest) {
 
       if (data?.role) {
         role = data.role as string
-        roleCache.set(user.id, {
+        roleCache.set(cacheKey, {
           role: role,
           expiresAt: Date.now() + ROLE_CACHE_TTL_MS,
         })

@@ -46,7 +46,7 @@ export async function apiClient<T>(
     const json = await res.json()
 
     if (res.status === 401 && typeof window !== "undefined") {
-      window.location.href = "/auth/login"
+      window.location.href = "/login"
       return { data: null, error: "Sesión expirada" }
     }
 

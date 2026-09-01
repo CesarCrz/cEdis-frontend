@@ -47,7 +47,7 @@ export default function RecetasPage() {
   const [editingReceta, setEditingReceta] = useState<Receta | undefined>()
   const [confirmDeactivate, setConfirmDeactivate] = useState<Receta | null>(null)
 
-  const { data: res, isLoading } = useRecetas(cedisId, { pageSize: 500 } as Parameters<typeof useRecetas>[1])
+  const { data: res, isLoading } = useRecetas(cedisId, { pageSize: 1000 } as Parameters<typeof useRecetas>[1])
   const { data: catRes } = useRecetaCategorias(cedisId)
   const updateReceta = useUpdateReceta(cedisId)
   const cloneReceta = useCloneReceta(cedisId)

@@ -6,10 +6,13 @@ import type { ProveedoresParams } from "@/lib/api/proveedores"
 
 const STALE_5MIN = 5 * 60 * 1000
 
+const CATALOG_PAGE_SIZE = 1000
+
 export function useProveedores(cedisId: string, params?: ProveedoresParams) {
+  const query = { pageSize: CATALOG_PAGE_SIZE, ...params }
   return useQuery({
-    queryKey: ["proveedores", cedisId, params],
-    queryFn: () => api.getProveedores(cedisId, params),
+    queryKey: ["proveedores", cedisId, query],
+    queryFn: () => api.getProveedores(cedisId, query),
     enabled: !!cedisId,
     staleTime: STALE_5MIN,
   })
