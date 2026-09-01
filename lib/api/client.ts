@@ -11,7 +11,7 @@ export async function apiClient<T>(
   path: string,
   options: FetchOptions = {}
 ): Promise<{ data: T | null; error: string | null }> {
-  const { params, ...fetchOptions } = options
+  const { params, headers: optionHeaders, ...fetchOptions } = options
 
   const url = new URL(`${BACKEND_URL}${path}`)
   if (params) {
@@ -22,19 +22,25 @@ export async function apiClient<T>(
 
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
-  const authHeader: Record<string, string> = session?.access_token
-    ? { Authorization: `Bearer ${session.access_token}` }
-    : {}
+
+  // FormData must not carry a manual Content-Type: the browser sets it
+  // along with the multipart boundary.
+  const isFormData =
+    typeof FormData !== "undefined" && fetchOptions.body instanceof FormData
+
+  const headers: Record<string, string> = {
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    ...(session?.access_token
+      ? { Authorization: `Bearer ${session.access_token}` }
+      : {}),
+    ...((optionHeaders as Record<string, string>) ?? {}),
+  }
 
   try {
     const res = await fetch(url.toString(), {
       signal: AbortSignal.timeout(15000),
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeader,
-        ...fetchOptions.headers,
-      },
       ...fetchOptions,
+      headers,
     })
 
     const json = await res.json()

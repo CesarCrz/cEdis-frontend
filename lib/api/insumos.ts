@@ -48,7 +48,6 @@ export async function importInsumosCsv(cedisId: string, file: File) {
     {
       method: "POST",
       body: formData,
-      headers: {},
     }
   )
 }
