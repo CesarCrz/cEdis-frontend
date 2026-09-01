@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { useParams } from "next/navigation"
 import { Check, ChevronsUpDown, Plus, PlusCircle, Trash2, Search } from "lucide-react"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
 import { KbdShortcut } from "@/components/common/kbd-shortcut"
 import { toast } from "sonner"
@@ -41,15 +42,14 @@ export default function MermasPage() {
   const [modalOpen, setModalOpen] = useState(false)
   useKeyboardShortcut("n", useCallback(() => setModalOpen(true), []), { enabled: !modalOpen })
 
-  const { data: res, isLoading } = useMermas(cedisId)
-  const mermas: Merma[] = (res?.data as Merma[] | undefined) ?? []
-
-  const filtered = search.trim()
-    ? mermas.filter((m) =>
-        m.insumo?.nombre?.toLowerCase().includes(search.toLowerCase()) ||
-        m.motivo?.toLowerCase().includes(search.toLowerCase())
-      )
-    : mermas
+  // Mermas grow without bound, so the search runs on the server rather than
+  // over whatever page happened to be loaded.
+  const debouncedSearch = useDebouncedValue(search.trim(), 300)
+  const { data: res, isLoading } = useMermas(
+    cedisId,
+    debouncedSearch ? { search: debouncedSearch } : undefined
+  )
+  const filtered: Merma[] = (res?.data as Merma[] | undefined) ?? []
 
   return (
     <div className="space-y-6">

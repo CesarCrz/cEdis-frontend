@@ -61,7 +61,7 @@ export function TicketEditModal({ open, onClose, cedisId, ticket }: TicketEditMo
   const [searchOpen, setSearchOpen] = useState<number | null>(null)
 
   const updateVenta = useUpdateVenta(cedisId)
-  const { data: insumosRes } = useInsumos(cedisId, { pageSize: 1000 })
+  const { data: insumosRes } = useInsumos(cedisId)
   const { data: uomRes } = useUnidadesMedida()
 
   const insumos = insumosRes?.data ?? []

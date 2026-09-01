@@ -1,11 +1,8 @@
-import { apiClient } from "./client"
+import { apiClient, apiClientAll } from "./client"
 import type { Categoria } from "@/types/app.types"
 
 export async function getCategorias(cedisId: string) {
-  // Load the whole catalog: the server pages at 50 by default.
-  return apiClient<Categoria[]>(`/api/${cedisId}/categorias`, {
-    params: { pageSize: 1000 },
-  })
+  return apiClientAll<Categoria>(`/api/${cedisId}/categorias`)
 }
 
 export async function createCategoria(cedisId: string, nombre: string) {

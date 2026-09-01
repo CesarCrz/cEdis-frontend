@@ -78,7 +78,7 @@ export function RecetaModal({ open, onClose, cedisId, receta }: RecetaModalProps
   const updateReceta = useUpdateReceta(cedisId)
   const createCat = useCreateRecetaCategoria(cedisId)
 
-  const { data: insumosRes } = useInsumos(cedisId, { pageSize: 1000 })
+  const { data: insumosRes } = useInsumos(cedisId)
   const { data: recetasRes } = useRecetas(cedisId)
   const { data: catRes } = useRecetaCategorias(cedisId)
 

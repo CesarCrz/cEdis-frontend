@@ -1,4 +1,4 @@
-import { apiClient } from "./client"
+import { apiClient, apiClientAll } from "./client"
 import type { Cliente } from "@/types/app.types"
 
 export interface ClientesParams {
@@ -8,7 +8,7 @@ export interface ClientesParams {
 }
 
 export async function getClientes(cedisId: string, params?: ClientesParams) {
-  return apiClient<Cliente[]>(`/api/${cedisId}/clientes`, {
+  return apiClientAll<Cliente>(`/api/${cedisId}/clientes`, {
     params: params as Record<string, string | number | boolean | undefined>,
   })
 }

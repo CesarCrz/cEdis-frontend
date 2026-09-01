@@ -6,15 +6,12 @@ import type { InsumosParams } from "@/lib/api/insumos"
 
 const STALE_5MIN = 5 * 60 * 1000
 
-// Catalogs are loaded whole so that search/filter run over every row, not
-// just the first server page (default 50).
-const CATALOG_PAGE_SIZE = 1000
-
+// getInsumos walks every server page, so callers get the whole catalog and
+// client-side search sees every row.
 export function useInsumos(cedisId: string, params?: InsumosParams) {
-  const query = { pageSize: CATALOG_PAGE_SIZE, ...params }
   return useQuery({
-    queryKey: ["insumos", cedisId, query],
-    queryFn: () => api.getInsumos(cedisId, query),
+    queryKey: ["insumos", cedisId, params],
+    queryFn: () => api.getInsumos(cedisId, params),
     enabled: !!cedisId,
     staleTime: STALE_5MIN,
   })

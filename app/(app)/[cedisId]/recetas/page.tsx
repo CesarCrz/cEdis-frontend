@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react"
 import { useParams } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, PlusCircle, ChefHat, Copy, PowerOff, Search, X } from "lucide-react"
+import { MoreHorizontal, PlusCircle, ChefHat, Copy, PowerOff, Search, X, Upload } from "lucide-react"
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut"
 import { KbdShortcut } from "@/components/common/kbd-shortcut"
 import { toast } from "sonner"
@@ -13,6 +13,7 @@ import { DataTable } from "@/components/common/data-table"
 import { EmptyState } from "@/components/common/empty-state"
 import { ConfirmDialog } from "@/components/common/confirm-dialog"
 import { RecetaModal } from "@/components/recetas/receta-modal"
+import { RecetaCsvImportSheet } from "@/components/recetas/csv-import-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -43,11 +44,12 @@ export default function RecetasPage() {
   const [categoriaFilter, setCategoriaFilter] = useState("")
   const [pageIndex, setPageIndex] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
+  const [csvSheetOpen, setCsvSheetOpen] = useState(false)
   useKeyboardShortcut("n", useCallback(() => { setEditingReceta(undefined); setModalOpen(true) }, []), { enabled: !modalOpen })
   const [editingReceta, setEditingReceta] = useState<Receta | undefined>()
   const [confirmDeactivate, setConfirmDeactivate] = useState<Receta | null>(null)
 
-  const { data: res, isLoading } = useRecetas(cedisId, { pageSize: 1000 } as Parameters<typeof useRecetas>[1])
+  const { data: res, isLoading } = useRecetas(cedisId)
   const { data: catRes } = useRecetaCategorias(cedisId)
   const updateReceta = useUpdateReceta(cedisId)
   const cloneReceta = useCloneReceta(cedisId)
@@ -165,10 +167,16 @@ export default function RecetasPage() {
         title="Recetas"
         description="Define las fórmulas y costos de tus productos"
         actions={
-          <Button onClick={() => { setEditingReceta(undefined); setModalOpen(true) }}>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Nueva receta<KbdShortcut keys="n" />
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCsvSheetOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" aria-hidden />
+              Importar CSV
+            </Button>
+            <Button onClick={() => { setEditingReceta(undefined); setModalOpen(true) }}>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Nueva receta<KbdShortcut keys="n" />
+            </Button>
+          </div>
         }
       />
 
@@ -224,6 +232,12 @@ export default function RecetasPage() {
         onClose={() => { setModalOpen(false); setEditingReceta(undefined) }}
         cedisId={cedisId}
         receta={editingReceta}
+      />
+
+      <RecetaCsvImportSheet
+        open={csvSheetOpen}
+        onClose={() => setCsvSheetOpen(false)}
+        cedisId={cedisId}
       />
 
       <ConfirmDialog

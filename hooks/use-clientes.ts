@@ -6,13 +6,10 @@ import type { ClientesParams } from "@/lib/api/clientes"
 
 const STALE_5MIN = 5 * 60 * 1000
 
-const CATALOG_PAGE_SIZE = 1000
-
 export function useClientes(cedisId: string, params?: ClientesParams) {
-  const query = { pageSize: CATALOG_PAGE_SIZE, ...params }
   return useQuery({
-    queryKey: ["clientes", cedisId, query],
-    queryFn: () => api.getClientes(cedisId, query),
+    queryKey: ["clientes", cedisId, params],
+    queryFn: () => api.getClientes(cedisId, params),
     enabled: !!cedisId,
     staleTime: STALE_5MIN,
   })

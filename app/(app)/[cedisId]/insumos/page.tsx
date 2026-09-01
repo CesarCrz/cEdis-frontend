@@ -15,6 +15,7 @@ import {
   Package,
   History,
   PowerOff,
+  AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -104,8 +105,8 @@ export default function InsumosPage() {
     null
   )
 
-  // Fetch all at once — filter client-side for instant search
-  const { data: res, isLoading } = useInsumos(cedisId, { pageSize: 1000 })
+  // Every page is fetched so client-side search covers the whole catalog.
+  const { data: res, isLoading } = useInsumos(cedisId)
   const { data: categoriasRes } = useCategorias(cedisId)
   const { data: proveedoresRes } = useProveedores(cedisId)
   const updateInsumo = useUpdateInsumo(cedisId)
@@ -141,6 +142,9 @@ export default function InsumosPage() {
     }
     return true
   })
+
+  // Only trips on a catalog past the fetch-all ceiling; never fail silently.
+  const truncated = res?.truncated ?? false
 
   const hasFilters = !!search || !!categoriaFilter || !!proveedorFilter || !!alertaFilter
 
@@ -419,6 +423,17 @@ export default function InsumosPage() {
       </div>
 
       {/* Table */}
+      {truncated && (
+        <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:border-yellow-900 dark:bg-yellow-950/30 dark:text-yellow-400">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden />
+          <span>
+            El catálogo es demasiado grande para cargarse completo. La búsqueda
+            solo cubre los insumos cargados — usa los filtros de categoría o
+            proveedor para acotar.
+          </span>
+        </div>
+      )}
+
       {!isLoading && insumos.length === 0 && !hasFilters ? (
         <EmptyState
           icon={Package}

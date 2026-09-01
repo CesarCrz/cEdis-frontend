@@ -1,12 +1,9 @@
-import { apiClient } from "./client"
+import { apiClient, apiClientAll } from "./client"
 import type { CanalVenta } from "@/types/app.types"
 
 export const canalesApi = {
   list: (cedisId: string) =>
-    // Load the whole catalog: the server pages at 50 by default.
-    apiClient<CanalVenta[]>(`/api/${cedisId}/canales-venta`, {
-      params: { pageSize: 1000 },
-    }),
+    apiClientAll<CanalVenta>(`/api/${cedisId}/canales-venta`),
 
   create: (cedisId: string, data: { nombre: string; comision_pct?: number }) =>
     apiClient<CanalVenta>(`/api/${cedisId}/canales-venta`, {

@@ -66,7 +66,7 @@ export function EntradaModal({ open, onClose, cedisId }: EntradaModalProps) {
   const [searchOpen, setSearchOpen] = useState<number | null>(null)
 
   const createEntrada = useCreateEntrada(cedisId)
-  const { data: insumosRes } = useInsumos(cedisId, { pageSize: 1000 })
+  const { data: insumosRes } = useInsumos(cedisId)
   const { data: proveedoresRes } = useProveedores(cedisId)
 
   const insumos = insumosRes?.data ?? []

@@ -68,7 +68,7 @@ export function TicketModal({ open, onClose, cedisId }: TicketModalProps) {
 
   const createVenta = useCreateVenta(cedisId)
   const { data: clientesRes } = useClientes(cedisId)
-  const { data: insumosRes } = useInsumos(cedisId, { pageSize: 1000 })
+  const { data: insumosRes } = useInsumos(cedisId)
   const { data: uomRes } = useUnidadesMedida()
 
   const clientes = clientesRes?.data ?? []

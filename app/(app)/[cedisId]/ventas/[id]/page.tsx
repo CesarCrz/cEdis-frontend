@@ -46,7 +46,7 @@ export default function VentaDetailPage() {
   const [editOpen, setEditOpen] = useState(false)
 
   const { data: res, isLoading } = useVenta(cedisId, id)
-  const { data: insumosRes } = useInsumos(cedisId, { pageSize: 1000 })
+  const { data: insumosRes } = useInsumos(cedisId)
   const { data: uomRes } = useUnidadesMedida()
   const insumos = insumosRes?.data ?? []
   const unidades = uomRes?.data ?? []

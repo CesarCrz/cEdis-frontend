@@ -7,10 +7,24 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>
 }
 
+/** Pagination metadata returned by list endpoints. */
+export interface PageMeta {
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export interface ApiResult<T> {
+  data: T | null
+  error: string | null
+  meta?: PageMeta
+}
+
 export async function apiClient<T>(
   path: string,
   options: FetchOptions = {}
-): Promise<{ data: T | null; error: string | null }> {
+): Promise<ApiResult<T>> {
   const { params, headers: optionHeaders, ...fetchOptions } = options
 
   const url = new URL(`${BACKEND_URL}${path}`)
@@ -57,8 +71,59 @@ export async function apiClient<T>(
       }
     }
 
-    return { data: json.data ?? json, error: null }
+    return { data: json.data ?? json, error: null, meta: json.meta }
   } catch {
     return { data: null, error: "Error de conexión" }
+  }
+}
+
+const FETCH_ALL_PAGE_SIZE = 500
+// Hard stop so a runaway dataset can never lock up the browser. Lists that can
+// legitimately grow past this (kardex, mermas) search server-side instead.
+const FETCH_ALL_MAX_PAGES = 40
+
+/**
+ * Load every page of a list endpoint, not just the first.
+ *
+ * Catalogs (insumos, recetas, clientes...) are filtered client-side for instant
+ * search, which only works if the browser actually holds every row. This walks
+ * the server's pagination until `meta.pages` is exhausted.
+ */
+export async function apiClientAll<T>(
+  path: string,
+  options: FetchOptions = {}
+): Promise<ApiResult<T[]> & { truncated: boolean }> {
+  const baseParams = { ...(options.params ?? {}) }
+  const pageSize = Number(baseParams.pageSize ?? FETCH_ALL_PAGE_SIZE)
+
+  const first = await apiClient<T[]>(path, {
+    ...options,
+    params: { ...baseParams, page: 1, pageSize },
+  })
+  if (first.error || !first.data) {
+    return { data: null, error: first.error, truncated: false }
+  }
+
+  const totalPages = first.meta?.pages ?? 1
+  const rows = [...first.data]
+
+  const lastPage = Math.min(totalPages, FETCH_ALL_MAX_PAGES)
+  for (let page = 2; page <= lastPage; page++) {
+    const next = await apiClient<T[]>(path, {
+      ...options,
+      params: { ...baseParams, page, pageSize },
+    })
+    if (next.error || !next.data) {
+      // Partial data is still useful; flag it so the UI can warn.
+      return { data: rows, error: null, meta: first.meta, truncated: true }
+    }
+    rows.push(...next.data)
+  }
+
+  return {
+    data: rows,
+    error: null,
+    meta: first.meta,
+    truncated: totalPages > lastPage,
   }
 }

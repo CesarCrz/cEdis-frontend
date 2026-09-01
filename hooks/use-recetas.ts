@@ -6,15 +6,23 @@ import type { RecetasParams } from "@/lib/api/recetas"
 
 const STALE_5MIN = 5 * 60 * 1000
 
-const CATALOG_PAGE_SIZE = 1000
-
 export function useRecetas(cedisId: string, params?: RecetasParams) {
-  const query = { pageSize: CATALOG_PAGE_SIZE, ...params }
   return useQuery({
-    queryKey: ["recetas", cedisId, query],
-    queryFn: () => api.getRecetas(cedisId, query),
+    queryKey: ["recetas", cedisId, params],
+    queryFn: () => api.getRecetas(cedisId, params),
     enabled: !!cedisId,
     staleTime: STALE_5MIN,
+  })
+}
+
+export function useImportRecetasCsv(cedisId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => api.importRecetasCsv(cedisId, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["recetas", cedisId] })
+      qc.invalidateQueries({ queryKey: ["receta-categorias", cedisId] })
+    },
   })
 }
 

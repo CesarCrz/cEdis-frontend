@@ -1,4 +1,4 @@
-import { apiClient } from "./client"
+import { apiClient, apiClientAll } from "./client"
 import type { Receta } from "@/types/app.types"
 
 export interface RecetasParams {
@@ -8,7 +8,7 @@ export interface RecetasParams {
 }
 
 export async function getRecetas(cedisId: string, params?: RecetasParams) {
-  return apiClient<Receta[]>(`/api/${cedisId}/recetas`, {
+  return apiClientAll<Receta>(`/api/${cedisId}/recetas`, {
     params: params as Record<string, string | number | boolean | undefined>,
   })
 }
@@ -35,6 +35,18 @@ export async function deleteReceta(cedisId: string, id: string) {
   return apiClient<{ success: boolean }>(`/api/${cedisId}/recetas/${id}`, {
     method: "DELETE",
   })
+}
+
+export async function importRecetasCsv(cedisId: string, file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+  return apiClient<{ imported: number; errors: { row: number; message: string }[] }>(
+    `/api/${cedisId}/recetas/import-csv`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  )
 }
 
 export async function cloneReceta(cedisId: string, id: string) {

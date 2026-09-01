@@ -1,4 +1,4 @@
-import { apiClient } from "./client"
+import { apiClient, apiClientAll } from "./client"
 import type { Insumo } from "@/types/app.types"
 
 export interface InsumosParams {
@@ -10,8 +10,9 @@ export interface InsumosParams {
   pageSize?: number
 }
 
+// The catalog is filtered client-side, so every row has to reach the browser.
 export async function getInsumos(cedisId: string, params?: InsumosParams) {
-  return apiClient<Insumo[]>(`/api/${cedisId}/insumos`, {
+  return apiClientAll<Insumo>(`/api/${cedisId}/insumos`, {
     params: params as Record<string, string | number | boolean | undefined>,
   })
 }

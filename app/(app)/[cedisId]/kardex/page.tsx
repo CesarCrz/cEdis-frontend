@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useKardex } from "@/hooks/use-kardex"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useClientes } from "@/hooks/use-clientes"
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
@@ -78,7 +79,11 @@ export default function KardexPage() {
   const [desde, setDesde] = useState(getDefaultDesde)
   const [hasta, setHasta] = useState("")
 
+  // The kardex grows without bound, so search runs on the server.
+  const debouncedSearch = useDebouncedValue(search.trim(), 300)
+
   const filters = {
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(tipoFilter && tipoFilter !== "todos"
       ? { tipo: tipoFilter as KardexTipo }
       : {}),
@@ -92,19 +97,8 @@ export default function KardexPage() {
   const { data: res, isLoading } = useKardex(cedisId, filters)
   const { data: clientesRes } = useClientes(cedisId)
 
-  const rawEntradas = res?.data ?? []
+  const entradas = res?.data ?? []
   const clientes = clientesRes?.data ?? []
-
-  const entradas = search.trim()
-    ? rawEntradas.filter((e) => {
-        const q = search.toLowerCase()
-        return (
-          e.insumo?.nombre?.toLowerCase().includes(q) ||
-          e.insumo?.sku?.toLowerCase().includes(q) ||
-          e.notas?.toLowerCase().includes(q)
-        )
-      })
-    : rawEntradas
 
   const hasFilters = !!search || !!tipoFilter || !!clienteFilter
 

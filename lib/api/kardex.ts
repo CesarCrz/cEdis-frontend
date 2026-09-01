@@ -2,6 +2,7 @@ import { apiClient } from "./client"
 import type { KardexEntry, KardexTipo } from "@/types/app.types"
 
 export interface KardexParams {
+  search?: string
   insumo_id?: string
   tipo?: KardexTipo | KardexTipo[]
   cliente_id?: string
